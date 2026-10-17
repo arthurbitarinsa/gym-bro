@@ -15,7 +15,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.arthurbitarinsa.gymbro",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "IronMate uses the microphone for voice calls with your gym partners.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -39,7 +43,9 @@
           "color": "#1D9E75"
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc"
     ],
     "extra": {
       "eas": {

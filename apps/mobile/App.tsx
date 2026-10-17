@@ -16,6 +16,9 @@ import GymMembers from './src/screens/GymMembers'
 import UserProfile from './src/screens/UserProfile'
 import MessageBanner from './src/screens/MessageBanner'
 import { useInbox } from './src/lib/inbox'
+import { useCalls, NEEDED_MESSAGES, type CallsApi } from './src/lib/calls'
+import { callStrings } from './src/lib/callStrings'
+import { CallLayer, CallLockedSheet } from './src/screens/CallUI'
 import { inboxStrings } from './src/lib/inboxStrings'
 import UserActionsSheet, { safetyStrings } from './src/screens/SafetySheet'
 import { getHiddenIds } from './src/lib/safety'
@@ -1138,7 +1141,17 @@ function OnboardingGym({ t, onNext, onBack, session }: { t: Record<string,string
   )
 }
 
-function MainScreen({ t, lang, onLanguageChange, session, onSignOut }: { t: Record<string,string>, lang: string, onLanguageChange: (code: string) => void, session: Session | null, onSignOut: () => void }) {
+function MainScreen(props: { t: Record<string,string>, lang: string, onLanguageChange: (code: string) => void, session: Session | null, onSignOut: () => void }) {
+  const calls = useCalls(props.session?.user.id)
+  return (
+    <>
+      <MainScreenInner {...props} calls={calls} />
+      <CallLayer lang={props.lang} call={calls.current} peer={calls.peer} myId={props.session?.user.id} onRespond={calls.respond} />
+    </>
+  )
+}
+
+function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls }: { t: Record<string,string>, lang: string, onLanguageChange: (code: string) => void, session: Session | null, onSignOut: () => void, calls: CallsApi }) {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'discover' | 'chats' | 'matches' | 'profile'>('discover')
@@ -1193,7 +1206,7 @@ function MainScreen({ t, lang, onLanguageChange, session, onSignOut }: { t: Reco
   if (activeChat) {
     return (
       <View style={{ flex: 1 }}>
-        <ChatScreen key={activeChat.matchId} t={t} lang={lang} session={session} matchId={activeChat.matchId} otherUser={activeChat.otherUser} onBack={() => { inbox.markRead(activeChat.matchId); inbox.refresh(); setActiveChat(null) }} />
+        <ChatScreen key={activeChat.matchId} t={t} lang={lang} session={session} matchId={activeChat.matchId} otherUser={activeChat.otherUser} onCall={calls.start} callBusy={!!calls.current} onBack={() => { inbox.markRead(activeChat.matchId); inbox.refresh(); setActiveChat(null) }} />
         {inbox.banner && <MessageBanner banner={inbox.banner} onOpen={() => openChat(inbox.banner!.matchId, inbox.banner!.other)} onDismiss={inbox.dismissBanner} />}
       </View>
     )
@@ -1281,13 +1294,25 @@ function MainScreen({ t, lang, onLanguageChange, session, onSignOut }: { t: Reco
   )
 }
 
-function ChatScreen({ t, lang, session, matchId, otherUser, onBack }: { t: Record<string,string>, lang: string, session: Session | null, matchId: string, otherUser: any, onBack: () => void }) {
+function ChatScreen({ t, lang, session, matchId, otherUser, onBack, onCall, callBusy }: { t: Record<string,string>, lang: string, session: Session | null, matchId: string, otherUser: any, onBack: () => void, onCall: (matchId: string, other: any) => Promise<string | null>, callBusy: boolean }) {
   const [messages, setMessages] = useState<any[]>([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [showActions, setShowActions] = useState(false)
+  const [showLocked, setShowLocked] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
+  const myCount = messages.filter(m => m.sender_id === session?.user.id).length
+  const theirCount = messages.length - myCount
+  const callUnlocked = myCount >= NEEDED_MESSAGES && theirCount >= NEEDED_MESSAGES
+
+  async function pressCall() {
+    const cs = callStrings(lang)
+    if (!callUnlocked) { setShowLocked(true); return }
+    if (callBusy) { Alert.alert(cs.err_busy); return }
+    const err = await onCall(matchId, otherUser)
+    if (err) Alert.alert(err === 'locked' ? cs.err_locked : err === 'busy' ? cs.err_busy : cs.err_generic)
+  }
 
   useEffect(() => {
     loadMessages()
@@ -1338,6 +1363,9 @@ function ChatScreen({ t, lang, session, matchId, otherUser, onBack }: { t: Recor
             <Text style={styles.chatHeaderSub}>@{otherUser?.username}</Text>
           </View>
         </View>
+        <TouchableOpacity onPress={pressCall} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }} style={{ width: 38, height: 38, borderRadius: 19, marginRight: 6, justifyContent: 'center', alignItems: 'center', backgroundColor: callUnlocked ? '#1D9E75' : '#E8EEEB' }}>
+          <Text style={{ fontSize: 17, opacity: callUnlocked ? 1 : 0.55 }}>{callUnlocked ? '📞' : '🔒'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => setShowActions(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ paddingHorizontal: 8 }}>
           <Text style={{ fontSize: 22, color: '#888', fontWeight: '800' }}>⋯</Text>
         </TouchableOpacity>
@@ -1372,6 +1400,9 @@ function ChatScreen({ t, lang, session, matchId, otherUser, onBack }: { t: Recor
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      {showLocked && (
+        <CallLockedSheet lang={lang} name={otherUser?.full_name || otherUser?.username || ''} mine={myCount} theirs={theirCount} onClose={() => setShowLocked(false)} />
+      )}
       {showActions && (
         <UserActionsSheet
           lang={lang}
