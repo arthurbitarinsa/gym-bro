@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Gym Bro",
+    "name": "IronMate",
     "slug": "gym-bro",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,14 +13,21 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.gymbro.app"
+      "bundleIdentifier": "com.arthurbitarinsa.gymbro",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1D9E75"
       },
-      "package": "com.gymbro.app"
+      "package": "com.gymbro.app",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "scheme": "gymbro",
     "plugins": [
@@ -31,7 +38,20 @@
           "icon": "./assets/icon.png",
           "color": "#1D9E75"
         }
-      ]
-    ]
+      ],
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "decca98f-3b55-4e1b-8e52-01fc0d96090f"
+      }
+    },
+    "owner": "arthurbitarinsa",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/decca98f-3b55-4e1b-8e52-01fc0d96090f"
+    }
   }
 }

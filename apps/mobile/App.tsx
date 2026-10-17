@@ -2,11 +2,24 @@ import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, KeyboardAvoidingView, Platform, ScrollView,
-  ActivityIndicator, SafeAreaView, FlatList
+  ActivityIndicator, SafeAreaView, FlatList, Image, Linking
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
+import * as ImagePicker from 'expo-image-picker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from './src/lib/supabase'
+import SettingsScreen from './src/screens/SettingsScreen'
+import ProfileTab from './src/screens/ProfileTab'
+import { CityChips, SelectionDock } from './src/screens/GymPickerBits'
+import ChatsTab from './src/screens/ChatsTab'
+import GymMembers from './src/screens/GymMembers'
+import UserProfile from './src/screens/UserProfile'
+import MessageBanner from './src/screens/MessageBanner'
+import { useInbox } from './src/lib/inbox'
+import { inboxStrings } from './src/lib/inboxStrings'
+import UserActionsSheet, { safetyStrings } from './src/screens/SafetySheet'
+import { getHiddenIds } from './src/lib/safety'
+import { PRIVACY_URL, TERMS_URL } from './src/lib/links'
 import { Session } from '@supabase/supabase-js'
 
 // ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
@@ -97,13 +110,27 @@ const T: Record<string, Record<string, string>> = {
     level_advanced: 'Advanced',
     level_advanced_desc: '3+ years',
     time_morning: '🌅 Morning',
-    time_morning_desc: '6am – 12pm',
+    time_morning_desc: '5am – 12pm',
     time_afternoon: '☀️ Afternoon',
     time_afternoon_desc: '12pm – 5pm',
     time_evening: '🌙 Evening',
-    time_evening_desc: '5pm – 10pm',
+    time_evening_desc: '5pm – 11pm',
     choose_language: 'Choose your language',
     language_sub: 'You can change this later in settings',
+    training_elsewhere: 'Training elsewhere?',
+    training_elsewhere_sub: 'Set a temporary gym if you\'re visiting another city',
+    visiting: '✈️ Visiting',
+    select_temp_gym: 'Select a gym',
+    select_duration: 'How long?',
+    duration_1day: '1 day',
+    duration_3days: '3 days',
+    duration_7days: '7 days',
+    duration_custom: 'Custom',
+    set_temp_gym: 'Set temporary gym',
+    clear_temp_gym: 'Back to home gym',
+    currently_at: 'Currently training at',
+    until: 'until',
+    home_gym: 'Home gym',
   },
   fr: {
     tagline: 'Trouve ton partenaire d\'entraînement en Belgique',
@@ -180,13 +207,27 @@ const T: Record<string, Record<string, string>> = {
     level_advanced: 'Avancé',
     level_advanced_desc: '3+ ans',
     time_morning: '🌅 Matin',
-    time_morning_desc: '6h – 12h',
+    time_morning_desc: '5h – 12h',
     time_afternoon: '☀️ Après-midi',
     time_afternoon_desc: '12h – 17h',
     time_evening: '🌙 Soir',
-    time_evening_desc: '17h – 22h',
+    time_evening_desc: '17h – 23h',
     choose_language: 'Choisis ta langue',
     language_sub: 'Tu pourras changer ça plus tard dans les paramètres',
+    training_elsewhere: 'Tu t\'entraînes ailleurs ?',
+    training_elsewhere_sub: 'Définis une salle temporaire si tu visites une autre ville',
+    visiting: '✈️ De passage',
+    select_temp_gym: 'Choisis une salle',
+    select_duration: 'Pour combien de temps ?',
+    duration_1day: '1 jour',
+    duration_3days: '3 jours',
+    duration_7days: '7 jours',
+    duration_custom: 'Personnalisé',
+    set_temp_gym: 'Définir la salle temporaire',
+    clear_temp_gym: 'Retour à ma salle habituelle',
+    currently_at: 'S\'entraîne actuellement à',
+    until: 'jusqu\'au',
+    home_gym: 'Salle habituelle',
   },
   nl: {
     tagline: 'Vind je trainingspartner in België',
@@ -263,13 +304,27 @@ const T: Record<string, Record<string, string>> = {
     level_advanced: 'Gevorderd',
     level_advanced_desc: '3+ jaar',
     time_morning: '🌅 Ochtend',
-    time_morning_desc: '6u – 12u',
+    time_morning_desc: '5u – 12u',
     time_afternoon: '☀️ Middag',
     time_afternoon_desc: '12u – 17u',
     time_evening: '🌙 Avond',
-    time_evening_desc: '17u – 22u',
+    time_evening_desc: '17u – 23u',
     choose_language: 'Kies je taal',
     language_sub: 'Je kunt dit later wijzigen in de instellingen',
+    training_elsewhere: 'Train je elders?',
+    training_elsewhere_sub: 'Stel een tijdelijke gym in als je een andere stad bezoekt',
+    visiting: '✈️ Op bezoek',
+    select_temp_gym: 'Kies een gym',
+    select_duration: 'Hoe lang?',
+    duration_1day: '1 dag',
+    duration_3days: '3 dagen',
+    duration_7days: '7 dagen',
+    duration_custom: 'Aangepast',
+    set_temp_gym: 'Tijdelijke gym instellen',
+    clear_temp_gym: 'Terug naar mijn vaste gym',
+    currently_at: 'Traint momenteel bij',
+    until: 'tot',
+    home_gym: 'Vaste gym',
   },
   de: {
     tagline: 'Finde deinen Trainingspartner in Belgien',
@@ -346,13 +401,27 @@ const T: Record<string, Record<string, string>> = {
     level_advanced: 'Experte',
     level_advanced_desc: '3+ Jahre',
     time_morning: '🌅 Morgen',
-    time_morning_desc: '6–12 Uhr',
+    time_morning_desc: '5–12 Uhr',
     time_afternoon: '☀️ Nachmittag',
     time_afternoon_desc: '12–17 Uhr',
     time_evening: '🌙 Abend',
-    time_evening_desc: '17–22 Uhr',
+    time_evening_desc: '17–23 Uhr',
     choose_language: 'Wähle deine Sprache',
     language_sub: 'Du kannst das später in den Einstellungen ändern',
+    training_elsewhere: 'Trainierst du anderswo?',
+    training_elsewhere_sub: 'Lege ein temporäres Gym fest, wenn du eine andere Stadt besuchst',
+    visiting: '✈️ Zu Besuch',
+    select_temp_gym: 'Gym auswählen',
+    select_duration: 'Wie lange?',
+    duration_1day: '1 Tag',
+    duration_3days: '3 Tage',
+    duration_7days: '7 Tage',
+    duration_custom: 'Benutzerdefiniert',
+    set_temp_gym: 'Temporäres Gym festlegen',
+    clear_temp_gym: 'Zurück zu meinem Stamm-Gym',
+    currently_at: 'Trainiert derzeit bei',
+    until: 'bis',
+    home_gym: 'Stamm-Gym',
   },
   es: {
     tagline: 'Encuentra tu compañero de entrenamiento en Bélgica',
@@ -429,13 +498,27 @@ const T: Record<string, Record<string, string>> = {
     level_advanced: 'Avanzado',
     level_advanced_desc: '3+ años',
     time_morning: '🌅 Mañana',
-    time_morning_desc: '6am – 12pm',
+    time_morning_desc: '5am – 12pm',
     time_afternoon: '☀️ Tarde',
     time_afternoon_desc: '12pm – 5pm',
     time_evening: '🌙 Noche',
-    time_evening_desc: '5pm – 10pm',
+    time_evening_desc: '5pm – 11pm',
     choose_language: 'Elige tu idioma',
     language_sub: 'Puedes cambiarlo más tarde en ajustes',
+    training_elsewhere: '¿Entrenas en otro lugar?',
+    training_elsewhere_sub: 'Configura un gimnasio temporal si visitas otra ciudad',
+    visiting: '✈️ De visita',
+    select_temp_gym: 'Selecciona un gimnasio',
+    select_duration: '¿Cuánto tiempo?',
+    duration_1day: '1 día',
+    duration_3days: '3 días',
+    duration_7days: '7 días',
+    duration_custom: 'Personalizado',
+    set_temp_gym: 'Configurar gimnasio temporal',
+    clear_temp_gym: 'Volver a mi gimnasio habitual',
+    currently_at: 'Entrenando actualmente en',
+    until: 'hasta',
+    home_gym: 'Gimnasio habitual',
   },
   it: {
     tagline: 'Trova il tuo partner di allenamento in Belgio',
@@ -512,13 +595,27 @@ const T: Record<string, Record<string, string>> = {
     level_advanced: 'Avanzato',
     level_advanced_desc: '3+ anni',
     time_morning: '🌅 Mattina',
-    time_morning_desc: '6am – 12pm',
+    time_morning_desc: '5am – 12pm',
     time_afternoon: '☀️ Pomeriggio',
     time_afternoon_desc: '12pm – 5pm',
     time_evening: '🌙 Sera',
-    time_evening_desc: '5pm – 10pm',
+    time_evening_desc: '5pm – 11pm',
     choose_language: 'Scegli la tua lingua',
     language_sub: 'Puoi cambiarlo in seguito nelle impostazioni',
+    training_elsewhere: 'Ti alleni altrove?',
+    training_elsewhere_sub: 'Imposta una palestra temporanea se visiti un\'altra città',
+    visiting: '✈️ In visita',
+    select_temp_gym: 'Seleziona una palestra',
+    select_duration: 'Per quanto tempo?',
+    duration_1day: '1 giorno',
+    duration_3days: '3 giorni',
+    duration_7days: '7 giorni',
+    duration_custom: 'Personalizzato',
+    set_temp_gym: 'Imposta palestra temporanea',
+    clear_temp_gym: 'Torna alla mia palestra abituale',
+    currently_at: 'Si allena attualmente a',
+    until: 'fino al',
+    home_gym: 'Palestra abituale',
   },
   pt: {
     tagline: 'Encontra o teu parceiro de treino na Bélgica',
@@ -595,13 +692,27 @@ const T: Record<string, Record<string, string>> = {
     level_advanced: 'Avançado',
     level_advanced_desc: '3+ anos',
     time_morning: '🌅 Manhã',
-    time_morning_desc: '6h – 12h',
+    time_morning_desc: '5h – 12h',
     time_afternoon: '☀️ Tarde',
     time_afternoon_desc: '12h – 17h',
     time_evening: '🌙 Noite',
-    time_evening_desc: '17h – 22h',
+    time_evening_desc: '17h – 23h',
     choose_language: 'Escolhe o teu idioma',
     language_sub: 'Podes mudar isto mais tarde nas definições',
+    training_elsewhere: 'Treinas noutro local?',
+    training_elsewhere_sub: 'Define um ginásio temporário se estás a visitar outra cidade',
+    visiting: '✈️ De visita',
+    select_temp_gym: 'Seleciona um ginásio',
+    select_duration: 'Por quanto tempo?',
+    duration_1day: '1 dia',
+    duration_3days: '3 dias',
+    duration_7days: '7 dias',
+    duration_custom: 'Personalizado',
+    set_temp_gym: 'Definir ginásio temporário',
+    clear_temp_gym: 'Voltar ao meu ginásio habitual',
+    currently_at: 'A treinar atualmente em',
+    until: 'até',
+    home_gym: 'Ginásio habitual',
   },
 }
 
@@ -664,13 +775,18 @@ export default function App() {
     }
   }
 
+  async function changeLanguage(code: string) {
+    setLang(code)
+    await AsyncStorage.setItem('gymbro_lang', code)
+  }
+
   if (screen === 'loading') return <LoadingScreen />
   if (screen === 'language') return <LanguageScreen onSelect={selectLanguage} />
-  if (screen === 'auth') return <AuthScreen t={t} onAuth={(type) => type === 'existing' ? setScreen('main') : setScreen('onboarding_basic')} />
+  if (screen === 'auth') return <AuthScreen t={t} lang={lang} onAuth={(type) => type === 'existing' ? setScreen('main') : setScreen('onboarding_basic')} />
   if (screen === 'onboarding_basic') return <OnboardingBasic t={t} onNext={() => setScreen('onboarding_training')} session={session} />
   if (screen === 'onboarding_training') return <OnboardingTraining t={t} onNext={() => setScreen('onboarding_gym')} onBack={() => setScreen('onboarding_basic')} session={session} />
   if (screen === 'onboarding_gym') return <OnboardingGym t={t} onNext={() => setScreen('main')} onBack={() => setScreen('onboarding_training')} session={session} />
-  if (screen === 'main') return <MainScreen t={t} session={session} onSignOut={() => setScreen('auth')} />
+  if (screen === 'main') return <MainScreen t={t} lang={lang} onLanguageChange={changeLanguage} session={session} onSignOut={() => setScreen('auth')} />
   return null
 }
 
@@ -681,8 +797,8 @@ function LanguageScreen({ onSelect }: { onSelect: (code: string) => void }) {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.langContainer}>
-        <Text style={styles.logo}>💪</Text>
-        <Text style={styles.appName}>Gym Bro</Text>
+        <Image source={require('./assets/icon.png')} style={{ width: 80, height: 80, borderRadius: 18, marginBottom: 8 }} />
+        <Text style={styles.appName}>IronMate</Text>
         <Text style={styles.langTitle}>Choose your language</Text>
         <Text style={styles.langSub}>Kies je taal · Choisissez votre langue</Text>
         <View style={styles.langGrid}>
@@ -701,13 +817,13 @@ function LanguageScreen({ onSelect }: { onSelect: (code: string) => void }) {
 function LoadingScreen() {
   return (
     <View style={styles.center}>
-      <Text style={styles.logo}>💪</Text>
+      <Image source={require('./assets/icon.png')} style={{ width: 80, height: 80, borderRadius: 18 }} />
       <ActivityIndicator color="#1D9E75" style={{ marginTop: 20 }} />
     </View>
   )
 }
 
-function AuthScreen({ t, onAuth }: { t: Record<string,string>, onAuth: (type: 'new' | 'existing') => void }) {
+function AuthScreen({ t, lang, onAuth }: { t: Record<string,string>, lang: string, onAuth: (type: 'new' | 'existing') => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -734,27 +850,59 @@ function AuthScreen({ t, onAuth }: { t: Record<string,string>, onAuth: (type: 'n
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Text style={styles.logo}>💪</Text>
-          <Text style={styles.appName}>Gym Bro</Text>
-          <Text style={styles.tagline}>{t.tagline}</Text>
+      <StatusBar style="light" />
+      <View style={styles.authHero}>
+        <View style={styles.authLogoWrap}>
+          <Image source={require('./assets/icon.png')} style={{ width: 60, height: 60, borderRadius: 14 }} />
         </View>
-        <View style={styles.form}>
-          <Text style={styles.formTitle}>{isSignUp ? t.create_account : t.welcome_back}</Text>
-          <TextInput style={styles.input} placeholder={t.email} placeholderTextColor="#999" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-          <TextInput style={styles.input} placeholder={t.password} placeholderTextColor="#999" value={password} onChangeText={setPassword} secureTextEntry />
-          <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleAuth} disabled={loading} activeOpacity={0.8}>
-            <Text style={styles.buttonText}>{loading ? t.loading : isSignUp ? t.create_account : t.sign_in}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={styles.toggleWrap}>
-            <Text style={styles.toggleText}>{isSignUp ? t.have_account : t.no_account}<Text style={styles.toggleLink}>{isSignUp ? t.sign_in : t.sign_up}</Text></Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.footer}>{t.footer}</Text>
-      </ScrollView>
+        <Text style={styles.authAppName}>IronMate</Text>
+        <Text style={styles.authTagline}>{t.footer}</Text>
+      </View>
+      <View style={styles.authCard}>
+        <Text style={styles.authCardTitle}>{isSignUp ? t.create_account : t.welcome_back}</Text>
+        <TextInput style={styles.authInput} placeholder={t.email} placeholderTextColor="#aaa" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+        <TextInput style={styles.authInput} placeholder={t.password} placeholderTextColor="#aaa" value={password} onChangeText={setPassword} secureTextEntry />
+        <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleAuth} disabled={loading} activeOpacity={0.8}>
+          <Text style={styles.buttonText}>{loading ? t.loading : isSignUp ? t.create_account : t.sign_in}</Text>
+        </TouchableOpacity>
+        {isSignUp && (
+          <View style={{ marginTop: 14, alignItems: 'center' }}>
+            <Text style={{ fontSize: 12.5, color: '#888', textAlign: 'center' }}>{safetyStrings(lang).consent_intro}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 14, marginTop: 4 }}>
+              <Text style={{ fontSize: 12.5, color: GREEN, fontWeight: '600' }} onPress={() => Linking.openURL(TERMS_URL)}>{safetyStrings(lang).terms}</Text>
+              <Text style={{ fontSize: 12.5, color: GREEN, fontWeight: '600' }} onPress={() => Linking.openURL(PRIVACY_URL)}>{safetyStrings(lang).privacy}</Text>
+            </View>
+          </View>
+        )}
+        <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={styles.toggleWrap}>
+          <Text style={styles.toggleText}>{isSignUp ? t.have_account : t.no_account}<Text style={styles.toggleLink}>{isSignUp ? t.sign_in : t.sign_up}</Text></Text>
+        </TouchableOpacity>
+      </View>
     </KeyboardAvoidingView>
+  )
+}
+
+async function uploadAvatar(userId: string, uri: string): Promise<string | null> {
+  try {
+    const ext = uri.split('.').pop()?.toLowerCase() || 'jpg'
+    const fileName = `${userId}/avatar.${ext}`
+    const response = await fetch(uri)
+    const blob = await response.blob()
+    const arrayBuffer = await new Response(blob).arrayBuffer()
+    const { error } = await supabase.storage.from('avatars').upload(fileName, arrayBuffer, { contentType: `image/${ext}`, upsert: true })
+    if (error) { console.log('upload error', error); return null }
+    const { data } = supabase.storage.from('avatars').getPublicUrl(fileName)
+    return data.publicUrl + '?t=' + Date.now()
+  } catch (e) { console.log('upload exception', e); return null }
+}
+
+function Avatar({ url, name, size = 48, style = {} }: { url?: string | null, name?: string, size?: number, style?: any }) {
+  const initials = (name || '?')[0].toUpperCase()
+  if (url) return <Image source={{ uri: url }} style={[{ width: size, height: size, borderRadius: size / 2 }, style]} />
+  return (
+    <View style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: GREEN, justifyContent: 'center', alignItems: 'center' }, style]}>
+      <Text style={{ color: '#fff', fontSize: size * 0.38, fontWeight: '700' }}>{initials}</Text>
+    </View>
   )
 }
 
@@ -762,13 +910,23 @@ function OnboardingBasic({ t, onNext, session }: { t: Record<string,string>, onN
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [bio, setBio] = useState('')
+  const [avatarUri, setAvatarUri] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  async function pickPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') { Alert.alert(t.error, 'Camera roll permission needed'); return }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7 })
+    if (!result.canceled) setAvatarUri(result.assets[0].uri)
+  }
 
   async function handleNext() {
     if (!username || !fullName) { Alert.alert(t.error, t.username_required); return }
     if (username.length < 3) { Alert.alert(t.error, t.username_short); return }
     setLoading(true)
-    const { error } = await supabase.from('profiles').upsert({ id: session?.user.id, username: username.toLowerCase().trim(), full_name: fullName.trim(), bio: bio.trim(), updated_at: new Date().toISOString() })
+    let avatar_url = null
+    if (avatarUri && session?.user.id) avatar_url = await uploadAvatar(session.user.id, avatarUri)
+    const { error } = await supabase.from('profiles').upsert({ id: session?.user.id, username: username.toLowerCase().trim(), full_name: fullName.trim(), bio: bio.trim(), avatar_url, updated_at: new Date().toISOString() })
     if (error) Alert.alert(t.error, error.message)
     else onNext()
     setLoading(false)
@@ -785,6 +943,12 @@ function OnboardingBasic({ t, onNext, session }: { t: Record<string,string>, onN
         </View>
         <Text style={styles.stepTitle}>{t.tell_us}</Text>
         <Text style={styles.stepSub}>{t.profile_visible}</Text>
+        <TouchableOpacity onPress={pickPhoto} style={styles.avatarPicker} activeOpacity={0.8}>
+          {avatarUri
+            ? <Image source={{ uri: avatarUri }} style={styles.avatarPickerImage} />
+            : <View style={styles.avatarPickerPlaceholder}><Text style={styles.avatarPickerIcon}>📷</Text><Text style={styles.avatarPickerText}>Add photo</Text></View>
+          }
+        </TouchableOpacity>
         <TextInput style={styles.input} placeholder={t.username_placeholder} placeholderTextColor="#999" value={username} onChangeText={setUsername} autoCapitalize="none" />
         <TextInput style={styles.input} placeholder={t.full_name} placeholderTextColor="#999" value={fullName} onChangeText={setFullName} />
         <TextInput style={[styles.input, styles.textArea]} placeholder={t.bio_placeholder} placeholderTextColor="#999" value={bio} onChangeText={setBio} multiline numberOfLines={3} />
@@ -881,6 +1045,7 @@ function OnboardingGym({ t, onNext, onBack, session }: { t: Record<string,string
   const [gyms, setGyms] = useState<{ id: string, name: string, city: string }[]>([])
   const [search, setSearch] = useState('')
   const [customGym, setCustomGym] = useState('')
+  const [cityFilter, setCityFilter] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -888,8 +1053,14 @@ function OnboardingGym({ t, onNext, onBack, session }: { t: Record<string,string
   }, [])
 
   const isOther = gyms.find(g => g.id === selectedGymId)?.name === 'Other / My gym is not listed'
-  const filteredGyms = search.length > 0 ? gyms.filter(g => g.name.toLowerCase().includes(search.toLowerCase()) || g.city.toLowerCase().includes(search.toLowerCase())) : gyms
+  const searched = search.length > 0 ? gyms.filter(g => g.name.toLowerCase().includes(search.toLowerCase()) || g.city.toLowerCase().includes(search.toLowerCase())) : gyms
+  const allCities = [...new Set(searched.map(g => g.city))]
+  const cityCounts: Record<string, number> = {}
+  searched.forEach(g => { cityCounts[g.city] = (cityCounts[g.city] || 0) + 1 })
+  const activeCity = allCities.includes(cityFilter) ? cityFilter : ''
+  const filteredGyms = activeCity ? searched.filter(g => g.city === activeCity) : searched
   const cities = [...new Set(filteredGyms.map(g => g.city))]
+  const selectedGym = gyms.find(g => g.id === selectedGymId)
 
   async function handleNext() {
     if (!selectedGymId) { Alert.alert(t.error, t.select_gym); return }
@@ -921,7 +1092,8 @@ function OnboardingGym({ t, onNext, onBack, session }: { t: Record<string,string
         </View>
         <Text style={styles.stepTitle}>{t.your_gym}</Text>
         <Text style={styles.stepSub}>{t.gym_sub}</Text>
-        <TextInput style={[styles.input, { marginBottom: 16 }]} placeholder={t.search_gym} placeholderTextColor="#999" value={search} onChangeText={setSearch} />
+        <TextInput style={[styles.input, { marginBottom: 12 }]} placeholder={t.search_gym} placeholderTextColor="#999" value={search} onChangeText={setSearch} />
+        <CityChips cities={allCities} counts={cityCounts} selected={activeCity} onSelect={setCityFilter} allLabel="All" />
         {gyms.length === 0 && <ActivityIndicator color="#1D9E75" style={{ marginTop: 20 }} />}
         {cities.map(city => (
           <View key={city}>
@@ -938,34 +1110,72 @@ function OnboardingGym({ t, onNext, onBack, session }: { t: Record<string,string
             ))}
           </View>
         ))}
-        {isOther && (
-          <View style={{ marginTop: 8, marginBottom: 8 }}>
-            <Text style={styles.sectionLabel}>{t.enter_gym_name}</Text>
-            <TextInput style={styles.input} placeholder={t.gym_placeholder} placeholderTextColor="#999" value={customGym} onChangeText={setCustomGym} />
-          </View>
+        {!selectedGymId && (
+          <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleNext} disabled={loading} activeOpacity={0.8}>
+            <Text style={styles.buttonText}>{loading ? t.saving : t.lets_go}</Text>
+          </TouchableOpacity>
         )}
-        <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleNext} disabled={loading} activeOpacity={0.8}>
-          <Text style={styles.buttonText}>{loading ? t.saving : t.lets_go}</Text>
-        </TouchableOpacity>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Text style={styles.backText}>{t.back}</Text>
         </TouchableOpacity>
+        <View style={{ height: selectedGymId ? (isOther ? 280 : 190) : 0 }} />
       </ScrollView>
+      <SelectionDock
+        visible={!!selectedGymId}
+        icon={isOther ? '➕' : '🏋️'}
+        title={selectedGym?.name || ''}
+        subtitle={isOther ? undefined : selectedGym?.city}
+        onClear={() => setSelectedGymId('')}
+        ctaLabel={loading ? t.saving : t.lets_go}
+        onCta={handleNext}
+        busy={loading}
+      >
+        {isOther && (
+          <TextInput style={[styles.input, { marginBottom: 14 }]} placeholder={t.gym_placeholder} placeholderTextColor="#999" value={customGym} onChangeText={setCustomGym} />
+        )}
+      </SelectionDock>
     </SafeAreaView>
   )
 }
 
-function MainScreen({ t, session, onSignOut }: { t: Record<string,string>, session: Session | null, onSignOut: () => void }) {
+function MainScreen({ t, lang, onLanguageChange, session, onSignOut }: { t: Record<string,string>, lang: string, onLanguageChange: (code: string) => void, session: Session | null, onSignOut: () => void }) {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'discover' | 'matches' | 'profile'>('discover')
+  const [activeTab, setActiveTab] = useState<'discover' | 'chats' | 'matches' | 'profile'>('discover')
   const [activeChat, setActiveChat] = useState<{ matchId: string, otherUser: any } | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showMembers, setShowMembers] = useState(false)
+  const [viewUser, setViewUser] = useState<any>(null)
+  const inbox = useInbox(session?.user.id, activeChat?.matchId ?? null)
+  const ix = inboxStrings(lang)
+
+  function openChat(matchId: string, otherUser: any) {
+    inbox.markRead(matchId)
+    inbox.dismissBanner()
+    setActiveChat({ matchId, otherUser })
+  }
 
   useEffect(() => { loadProfile() }, [])
 
   async function loadProfile() {
-    const { data } = await supabase.from('profiles').select('*, gyms(name, city)').eq('id', session?.user.id).single()
-    if (data) setProfile(data)
+    const { data: basic } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session?.user.id)
+      .single()
+    if (basic) {
+      let gyms = null
+      let temp_gym = null
+      if (basic.gym_id) {
+        const { data: g } = await supabase.from('gyms').select('name, city').eq('id', basic.gym_id).single()
+        gyms = g
+      }
+      if (basic.temp_gym_id) {
+        const { data: tg } = await supabase.from('gyms').select('name, city').eq('id', basic.temp_gym_id).single()
+        temp_gym = tg
+      }
+      setProfile({ ...basic, gyms, temp_gym })
+    }
     setLoading(false)
   }
 
@@ -976,39 +1186,107 @@ function MainScreen({ t, session, onSignOut }: { t: Record<string,string>, sessi
 
   if (loading) return <LoadingScreen />
 
+  const tempActive = profile?.temp_gym_id && profile?.temp_gym_expires_at && new Date(profile.temp_gym_expires_at) > new Date()
+  const activeGymId = tempActive ? profile.temp_gym_id : profile?.gym_id
+  const activeGymInfo = tempActive ? profile?.temp_gym : profile?.gyms
+
   if (activeChat) {
-    return <ChatScreen t={t} session={session} matchId={activeChat.matchId} otherUser={activeChat.otherUser} onBack={() => setActiveChat(null)} />
+    return (
+      <View style={{ flex: 1 }}>
+        <ChatScreen key={activeChat.matchId} t={t} lang={lang} session={session} matchId={activeChat.matchId} otherUser={activeChat.otherUser} onBack={() => { inbox.markRead(activeChat.matchId); inbox.refresh(); setActiveChat(null) }} />
+        {inbox.banner && <MessageBanner banner={inbox.banner} onOpen={() => openChat(inbox.banner!.matchId, inbox.banner!.other)} onDismiss={inbox.dismissBanner} />}
+      </View>
+    )
+  }
+
+  if (viewUser) {
+    return (
+      <View style={{ flex: 1 }}>
+        <UserProfile
+          key={viewUser.id}
+          t={t} lang={lang} myId={session?.user.id} user={viewUser}
+          onBack={() => setViewUser(null)}
+          onOpenChat={(matchId, other) => { setViewUser(null); setShowMembers(false); openChat(matchId, other) }}
+          onChanged={inbox.refresh}
+        />
+        {inbox.banner && <MessageBanner banner={inbox.banner} onOpen={() => { setViewUser(null); setShowMembers(false); openChat(inbox.banner!.matchId, inbox.banner!.other) }} onDismiss={inbox.dismissBanner} />}
+      </View>
+    )
+  }
+
+  if (showMembers) {
+    return (
+      <View style={{ flex: 1 }}>
+        <GymMembers
+          t={t} lang={lang} myId={session?.user.id}
+          gymId={activeGymId ?? null} gymName={activeGymInfo?.name || ''}
+          onOpenProfile={setViewUser}
+          connections={inbox.all}
+          onBack={() => setShowMembers(false)}
+          onOpenChat={(matchId, other) => { setShowMembers(false); openChat(matchId, other) }}
+        />
+        {inbox.banner && <MessageBanner banner={inbox.banner} onOpen={() => { setShowMembers(false); openChat(inbox.banner!.matchId, inbox.banner!.other) }} onDismiss={inbox.dismissBanner} />}
+      </View>
+    )
+  }
+
+  if (showSettings) {
+    return (
+      <SettingsScreen
+        t={t}
+        lang={lang}
+        profile={profile}
+        onBack={() => setShowSettings(false)}
+        onLanguageChange={onLanguageChange}
+        onProfileUpdate={loadProfile}
+        onSignOut={signOut}
+      />
+    )
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      {activeTab === 'discover' && <DiscoverTab t={t} session={session} profile={profile} />}
-      {activeTab === 'matches' && <MatchesTab t={t} session={session} onOpenChat={(matchId, otherUser) => setActiveChat({ matchId, otherUser })} />}
-      {activeTab === 'profile' && <ProfileTab t={t} profile={profile} onSignOut={signOut} />}
+      {activeTab === 'discover' && <DiscoverTab t={t} lang={lang} onOpenProfile={setViewUser} session={session} profile={profile} activeGymId={activeGymId} activeGymInfo={activeGymInfo} isVisiting={tempActive} />}
+      {activeTab === 'chats' && <ChatsTab lang={lang} conversations={inbox.all} myId={session?.user.id} onOpenChat={openChat} onOpenProfile={setViewUser} />}
+      {activeTab === 'matches' && <MatchesTab t={t} lang={lang} session={session} onChanged={inbox.refresh} onOpenProfile={setViewUser} />}
+      {activeTab === 'profile' && <ProfileTab t={t} lang={lang} connections={inbox.all} onFindPartner={() => setActiveTab('discover')} onOpenConnections={() => setActiveTab('chats')} onOpenMembers={() => setShowMembers(true)} profile={profile} onOpenSettings={() => setShowSettings(true)} onProfileUpdate={loadProfile} uploadAvatar={uploadAvatar} TempGymPicker={TempGymPickerModal} />}
       <View style={styles.tabBar}>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('discover')}>
           <Text style={[styles.tabIcon, activeTab === 'discover' && styles.tabActive]}>🔍</Text>
           <Text style={[styles.tabLabel, activeTab === 'discover' && styles.tabActive]}>{t.discover}</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('chats')}>
+          <View>
+            <Text style={[styles.tabIcon, activeTab === 'chats' && styles.tabActive]}>💬</Text>
+            {inbox.unreadTotal > 0 && (
+              <View style={{ position: 'absolute', top: -4, right: -10, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#E5484D', paddingHorizontal: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>{inbox.unreadTotal > 9 ? '9+' : inbox.unreadTotal}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.tabLabel, activeTab === 'chats' && styles.tabActive]}>{ix.chats}</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('matches')}>
-          <Text style={[styles.tabIcon, activeTab === 'matches' && styles.tabActive]}>💬</Text>
-          <Text style={[styles.tabLabel, activeTab === 'matches' && styles.tabActive]}>{t.matches}</Text>
+          <Text style={[styles.tabIcon, activeTab === 'matches' && styles.tabActive]}>🤝</Text>
+          <Text style={[styles.tabLabel, activeTab === 'matches' && styles.tabActive]}>{ix.requests}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('profile')}>
           <Text style={[styles.tabIcon, activeTab === 'profile' && styles.tabActive]}>👤</Text>
           <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabActive]}>{t.profile}</Text>
         </TouchableOpacity>
       </View>
+      {inbox.banner && <MessageBanner banner={inbox.banner} onOpen={() => openChat(inbox.banner!.matchId, inbox.banner!.other)} onDismiss={inbox.dismissBanner} />}
     </SafeAreaView>
   )
 }
 
-function ChatScreen({ t, session, matchId, otherUser, onBack }: { t: Record<string,string>, session: Session | null, matchId: string, otherUser: any, onBack: () => void }) {
+function ChatScreen({ t, lang, session, matchId, otherUser, onBack }: { t: Record<string,string>, lang: string, session: Session | null, matchId: string, otherUser: any, onBack: () => void }) {
   const [messages, setMessages] = useState<any[]>([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [showActions, setShowActions] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
@@ -1054,14 +1332,15 @@ function ChatScreen({ t, session, matchId, otherUser, onBack }: { t: Record<stri
           <Text style={styles.chatBackText}>←</Text>
         </TouchableOpacity>
         <View style={styles.chatHeaderInfo}>
-          <View style={styles.chatAvatar}>
-            <Text style={styles.chatAvatarText}>{(otherUser?.full_name || otherUser?.username || '?')[0].toUpperCase()}</Text>
-          </View>
+          <Avatar url={otherUser?.avatar_url} name={otherUser?.full_name || otherUser?.username} size={38} />
           <View>
             <Text style={styles.chatHeaderName}>{otherUser?.full_name || otherUser?.username}</Text>
             <Text style={styles.chatHeaderSub}>@{otherUser?.username}</Text>
           </View>
         </View>
+        <TouchableOpacity onPress={() => setShowActions(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ paddingHorizontal: 8 }}>
+          <Text style={{ fontSize: 22, color: '#888', fontWeight: '800' }}>⋯</Text>
+        </TouchableOpacity>
       </View>
       {loading ? <View style={styles.center}><ActivityIndicator color="#1D9E75" /></View> : (
         <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.messagesList} keyboardShouldPersistTaps="handled">
@@ -1093,21 +1372,50 @@ function ChatScreen({ t, session, matchId, otherUser, onBack }: { t: Record<stri
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      {showActions && (
+        <UserActionsSheet
+          lang={lang}
+          user={{ id: otherUser?.id, name: otherUser?.full_name || otherUser?.username || '' }}
+          context={messages.slice(-10).map(m => `${m.sender_id === session?.user.id ? 'Reporter' : 'Reported'}: ${m.content}`).join('\n')}
+          onClose={() => setShowActions(false)}
+          onBlocked={() => onBack()}
+        />
+      )}
     </SafeAreaView>
   )
 }
 
-function DiscoverTab({ t, session, profile }: { t: Record<string,string>, session: Session | null, profile: any }) {
+// ─── DISCOVER TAB ────────────────────────────────────────────────────────────
+
+function DiscoverTab({ t, lang, onOpenProfile, session, profile, activeGymId, activeGymInfo, isVisiting }: {
+  onOpenProfile: (user: any) => void
+  t: Record<string,string>
+  lang: string
+  session: Session | null
+  profile: any
+  activeGymId: string | null
+  activeGymInfo: any
+  isVisiting: boolean
+}) {
   const [bros, setBros] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [sentRequests, setSentRequests] = useState<string[]>([])
+  const [actionsFor, setActionsFor] = useState<{ id: string, name: string } | null>(null)
 
-  useEffect(() => { loadBros() }, [profile])
+  useEffect(() => { loadBros() }, [activeGymId])
 
   async function loadBros() {
-    if (!profile?.gym_id) { setLoading(false); return }
-    const { data } = await supabase.from('profiles').select('*').eq('gym_id', profile.gym_id).neq('id', session?.user.id)
-    if (data) setBros(data)
+    if (!activeGymId) { setLoading(false); return }
+    const now = new Date().toISOString()
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .or(`gym_id.eq.${activeGymId},and(temp_gym_id.eq.${activeGymId},temp_gym_expires_at.gt.${now})`)
+      .neq('id', session?.user.id)
+    if (data) {
+      const hidden = await getHiddenIds()
+      setBros(data.filter(b => !hidden.includes(b.id)))
+    }
     setLoading(false)
   }
 
@@ -1116,6 +1424,10 @@ function DiscoverTab({ t, session, profile }: { t: Record<string,string>, sessio
     if (bro.training_goal === profile?.training_goal) score += 20
     if (bro.experience_level === profile?.experience_level) score += 20
     return Math.min(score, 100)
+  }
+
+  function isBroVisiting(bro: any) {
+    return bro.temp_gym_id === activeGymId && bro.temp_gym_expires_at && new Date(bro.temp_gym_expires_at) > new Date()
   }
 
   async function sendRequest(broId: string) {
@@ -1132,10 +1444,15 @@ function DiscoverTab({ t, session, profile }: { t: Record<string,string>, sessio
       <View style={styles.discoverHeader}>
         <View>
           <Text style={styles.discoverTitle}>{t.discover}</Text>
-          <Text style={styles.discoverSub}>{profile?.gyms?.name || ''}</Text>
+          <Text style={styles.discoverSub}>{activeGymInfo?.name || ''}</Text>
         </View>
         <Text style={{ fontSize: 28 }}>💪</Text>
       </View>
+      {isVisiting && (
+        <View style={styles.visitingBanner}>
+          <Text style={styles.visitingBannerText}>{t.visiting} — {activeGymInfo?.name}</Text>
+        </View>
+      )}
       {loading && <ActivityIndicator color="#1D9E75" style={{ marginTop: 40 }} />}
       {!loading && bros.length === 0 && (
         <View style={styles.emptyState}>
@@ -1147,20 +1464,29 @@ function DiscoverTab({ t, session, profile }: { t: Record<string,string>, sessio
       {bros.map(bro => {
         const score = chemistryScore(bro)
         const sent = sentRequests.includes(bro.id)
+        const visiting = isBroVisiting(bro)
         return (
           <View key={bro.id} style={styles.broCard}>
             <View style={styles.broCardTop}>
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>{(bro.full_name || bro.username || '?')[0].toUpperCase()}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.broName}>{bro.full_name || bro.username}</Text>
-                <Text style={styles.broUsername}>@{bro.username}</Text>
-              </View>
+              <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }} activeOpacity={0.7} onPress={() => onOpenProfile(bro)}>
+                <Avatar url={bro.avatar_url} name={bro.full_name || bro.username} size={48} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.broName}>{bro.full_name || bro.username}</Text>
+                  <Text style={styles.broUsername}>@{bro.username}</Text>
+                </View>
+              </TouchableOpacity>
               <View style={[styles.scoreBadge, { backgroundColor: score >= 80 ? '#f0faf6' : '#fff8f0' }]}>
                 <Text style={[styles.scoreText, { color: score >= 80 ? '#1D9E75' : '#FF9800' }]}>{score}% {t.match}</Text>
               </View>
+              <TouchableOpacity onPress={() => setActionsFor({ id: bro.id, name: bro.full_name || bro.username })} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ paddingHorizontal: 4 }}>
+                <Text style={{ fontSize: 22, color: '#aaa', fontWeight: '800' }}>⋯</Text>
+              </TouchableOpacity>
             </View>
+            {visiting && (
+              <View style={[styles.tag, styles.visitingTag]}>
+                <Text style={[styles.tagText, { color: '#FF9800' }]}>{t.visiting}</Text>
+              </View>
+            )}
             {bro.bio ? <Text style={styles.broBio}>{bro.bio}</Text> : null}
             <View style={styles.broTags}>
               {bro.training_goal && <View style={styles.tag}><Text style={styles.tagText}>{goalEmoji[bro.training_goal]} {bro.training_goal}</Text></View>}
@@ -1172,12 +1498,24 @@ function DiscoverTab({ t, session, profile }: { t: Record<string,string>, sessio
           </View>
         )
       })}
+      {actionsFor && (
+        <UserActionsSheet
+          lang={lang}
+          user={actionsFor}
+          onClose={() => setActionsFor(null)}
+          onBlocked={(id) => setBros(prev => prev.filter(b => b.id !== id))}
+        />
+      )}
     </ScrollView>
   )
 }
 
-function MatchesTab({ t, session, onOpenChat }: { t: Record<string,string>, session: Session | null, onOpenChat: (matchId: string, otherUser: any) => void }) {
+// ─── MATCHES TAB ─────────────────────────────────────────────────────────────
+
+function MatchesTab({ t, lang, session, onChanged, onOpenProfile }: { t: Record<string,string>, lang: string, session: Session | null, onChanged: () => void, onOpenProfile: (user: any) => void }) {
+  const ix = inboxStrings(lang)
   const [matches, setMatches] = useState<any[]>([])
+  const [actionsFor, setActionsFor] = useState<{ id: string, name: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { loadMatches() }, [])
@@ -1188,25 +1526,29 @@ function MatchesTab({ t, session, onOpenChat }: { t: Record<string,string>, sess
       .select('*, user_a_profile:profiles!matches_user_a_fkey(*), user_b_profile:profiles!matches_user_b_fkey(*)')
       .or(`user_a.eq.${session?.user.id},user_b.eq.${session?.user.id}`)
       .order('created_at', { ascending: false })
-    if (data) setMatches(data)
+    if (data) {
+      const hidden = await getHiddenIds()
+      setMatches(data.filter(m => m.status !== 'accepted' && !hidden.includes(m.user_a === session?.user.id ? m.user_b : m.user_a)))
+    }
     setLoading(false)
   }
 
   async function acceptMatch(matchId: string) {
     await supabase.from('matches').update({ status: 'accepted' }).eq('id', matchId)
     loadMatches()
+    onChanged()
   }
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
-      <Text style={styles.discoverTitle}>{t.matches}</Text>
-      <Text style={[styles.discoverSub, { marginBottom: 20 }]}>{t.gym_connections}</Text>
+      <Text style={styles.discoverTitle}>{ix.requests}</Text>
+      <Text style={[styles.discoverSub, { marginBottom: 20 }]}>{ix.requests_sub}</Text>
       {loading && <ActivityIndicator color="#1D9E75" />}
       {!loading && matches.length === 0 && (
         <View style={styles.emptyState}>
           <Text style={{ fontSize: 48, marginBottom: 16 }}>🤝</Text>
-          <Text style={styles.emptyTitle}>{t.no_matches}</Text>
-          <Text style={styles.emptySub}>{t.no_matches_sub}</Text>
+          <Text style={styles.emptyTitle}>{ix.no_requests}</Text>
+          <Text style={styles.emptySub}>{ix.no_requests_sub}</Text>
         </View>
       )}
       {matches.map(match => {
@@ -1216,10 +1558,8 @@ function MatchesTab({ t, session, onOpenChat }: { t: Record<string,string>, sess
         const isIncoming = isPending && match.initiated_by !== session?.user.id
         const isAccepted = match.status === 'accepted'
         return (
-          <TouchableOpacity key={match.id} style={styles.matchCard} onPress={() => isAccepted && onOpenChat(match.id, other)} activeOpacity={isAccepted ? 0.7 : 1}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{(other?.full_name || other?.username || '?')[0].toUpperCase()}</Text>
-            </View>
+          <TouchableOpacity key={match.id} style={styles.matchCard} activeOpacity={0.7} onPress={() => onOpenProfile(other)}>
+            <Avatar url={other?.avatar_url} name={other?.full_name || other?.username} size={48} />
             <View style={{ flex: 1 }}>
               <Text style={styles.broName}>{other?.full_name || other?.username}</Text>
               <Text style={styles.broUsername}>@{other?.username}</Text>
@@ -1235,44 +1575,105 @@ function MatchesTab({ t, session, onOpenChat }: { t: Record<string,string>, sess
               </TouchableOpacity>
             )}
             {isAccepted && <Text style={{ fontSize: 20, color: '#ccc' }}>›</Text>}
+            <TouchableOpacity onPress={() => setActionsFor({ id: other?.id, name: other?.full_name || other?.username || '' })} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ paddingHorizontal: 6 }}>
+              <Text style={{ fontSize: 22, color: '#aaa', fontWeight: '800' }}>⋯</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         )
       })}
+      {actionsFor && (
+        <UserActionsSheet
+          lang={lang}
+          user={actionsFor}
+          onClose={() => setActionsFor(null)}
+          onBlocked={() => loadMatches()}
+        />
+      )}
     </ScrollView>
   )
 }
 
-function ProfileTab({ t, profile, onSignOut }: { t: Record<string,string>, profile: any, onSignOut: () => void }) {
-  const goalEmoji: any = { strength: '🏋️', hypertrophy: '💪', cardio: '🏃', sport: '⚽', general: '✨' }
+// ─── PROFILE TAB ─────────────────────────────────────────────────────────────
+
+function TempGymPickerModal({ t, profile, onClose, onSaved }: {
+  t: Record<string,string>
+  profile: any
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [gyms, setGyms] = useState<{ id: string, name: string, city: string }[]>([])
+  const [search, setSearch] = useState('')
+  const [selectedGymId, setSelectedGymId] = useState('')
+  const [duration, setDuration] = useState<1 | 3 | 7>(1)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    supabase.from('gyms').select('id, name, city').order('city').then(({ data }) => { if (data) setGyms(data) })
+  }, [])
+
+  const filteredGyms = search.length > 0
+    ? gyms.filter(g => g.name.toLowerCase().includes(search.toLowerCase()) || g.city.toLowerCase().includes(search.toLowerCase()))
+    : gyms
+
+  async function handleSave() {
+    if (!selectedGymId) { Alert.alert(t.error, t.select_gym); return }
+    setSaving(true)
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + duration)
+    const { error } = await supabase.from('profiles').update({
+      temp_gym_id: selectedGymId,
+      temp_gym_expires_at: expiresAt.toISOString(),
+    }).eq('id', profile.id)
+    if (error) Alert.alert(t.error, error.message)
+    else onSaved()
+    setSaving(false)
+  }
+
+  const durations: { value: 1 | 3 | 7, label: string }[] = [
+    { value: 1, label: t.duration_1day },
+    { value: 3, label: t.duration_3days },
+    { value: 7, label: t.duration_7days },
+  ]
+
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
-      <Text style={styles.discoverTitle}>{t.profile}</Text>
-      <View style={styles.profileCard}>
-        <View style={[styles.avatarCircle, { width: 72, height: 72, borderRadius: 36 }]}>
-          <Text style={[styles.avatarText, { fontSize: 28 }]}>{(profile?.full_name || profile?.username || '?')[0].toUpperCase()}</Text>
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalCard}>
+        <Text style={styles.modalTitle}>{t.select_temp_gym}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={t.search_gym}
+          placeholderTextColor="#999"
+          value={search}
+          onChangeText={setSearch}
+        />
+        <ScrollView style={{ maxHeight: 220 }}>
+          {filteredGyms.map(gym => (
+            <TouchableOpacity key={gym.id} style={[styles.gymCard, selectedGymId === gym.id && styles.optionSelected]} onPress={() => setSelectedGymId(gym.id)}>
+              <Text style={styles.gymIcon}>🏋️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.gymName}>{gym.name}</Text>
+                <Text style={styles.gymCity}>{gym.city}</Text>
+              </View>
+              {selectedGymId === gym.id && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Text style={[styles.sectionLabel, { marginTop: 12 }]}>{t.select_duration}</Text>
+        <View style={styles.rowOptions}>
+          {durations.map(d => (
+            <TouchableOpacity key={d.value} style={[styles.chipCard, duration === d.value && styles.optionSelected]} onPress={() => setDuration(d.value)}>
+              <Text style={styles.chipLabel}>{d.label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        <Text style={[styles.broName, { fontSize: 22, marginTop: 12 }]}>{profile?.full_name}</Text>
-        <Text style={styles.broUsername}>@{profile?.username}</Text>
-        {profile?.bio ? <Text style={[styles.broBio, { textAlign: 'center', marginTop: 8 }]}>{profile.bio}</Text> : null}
+        <TouchableOpacity style={[styles.button, saving && styles.buttonDisabled, { marginTop: 16 }]} onPress={handleSave} disabled={saving} activeOpacity={0.8}>
+          <Text style={styles.buttonText}>{saving ? t.saving : t.set_temp_gym}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onClose} style={styles.backBtn}>
+          <Text style={styles.backText}>{t.back}</Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.profileStats}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{goalEmoji[profile?.training_goal] || '✨'}</Text>
-          <Text style={styles.statLabel}>{profile?.training_goal || ''}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>🎯</Text>
-          <Text style={styles.statLabel}>{profile?.experience_level || ''}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>🏋️</Text>
-          <Text style={styles.statLabel}>{profile?.gyms?.name?.split(' ')[0] || ''}</Text>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
-        <Text style={styles.signOutText}>{t.sign_out}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </View>
   )
 }
 
@@ -1393,4 +1794,39 @@ const styles = StyleSheet.create({
   langCard: { width: '44%', borderWidth: 1.5, borderColor: '#e8e8e8', borderRadius: 16, padding: 18, alignItems: 'center', backgroundColor: '#fff' },
   langFlag: { fontSize: 36, marginBottom: 8 },
   langLabel: { fontSize: 15, fontWeight: '600', color: '#1a1a1a', textAlign: 'center' },
+
+  // Temp gym / visiting styles
+  visitingBanner: { backgroundColor: '#fff8f0', borderWidth: 1, borderColor: '#FF9800', borderRadius: 10, padding: 12, marginBottom: 16 },
+  visitingBannerText: { color: '#FF9800', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  visitingTag: { borderColor: '#FF9800', backgroundColor: '#fff8f0', alignSelf: 'flex-start', marginBottom: 10 },
+  tempGymSection: { marginBottom: 24 },
+  tempGymSetBtn: { borderWidth: 1.5, borderColor: GREEN, borderRadius: 12, padding: 16, alignItems: 'center', backgroundColor: '#f0faf6' },
+  tempGymSetBtnText: { color: GREEN, fontSize: 14, fontWeight: '600' },
+  tempGymActiveCard: { borderWidth: 1.5, borderColor: '#FF9800', borderRadius: 12, padding: 16, backgroundColor: '#fff8f0' },
+  tempGymActiveText: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+  tempGymActiveSub: { fontSize: 13, color: '#888', marginTop: 2, marginBottom: 12 },
+  tempGymClearBtn: { borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 8, padding: 10, alignItems: 'center', backgroundColor: '#fff' },
+  tempGymClearBtnText: { color: '#888', fontSize: 13, fontWeight: '600' },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, maxHeight: '80%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 16 },
+
+  // Auth redesign
+  authHero: { backgroundColor: GREEN, paddingTop: 80, paddingBottom: 48, alignItems: 'center', paddingHorizontal: 28 },
+  authLogoWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  authAppName: { fontSize: 34, fontWeight: '800', color: '#fff', letterSpacing: -0.5, marginBottom: 6 },
+  authTagline: { fontSize: 15, color: 'rgba(255,255,255,0.8)', textAlign: 'center', letterSpacing: 0.3 },
+  authCard: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, padding: 28, paddingTop: 32, marginTop: -20 },
+  authCardTitle: { fontSize: 22, fontWeight: '700', color: '#1a1a1a', marginBottom: 24 },
+  authInput: { borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 12, padding: 16, fontSize: 16, color: '#1a1a1a', marginBottom: 12, backgroundColor: '#fafafa' },
+
+  // Avatar picker in onboarding
+  avatarPicker: { alignSelf: 'center', marginBottom: 24 },
+  avatarPickerImage: { width: 96, height: 96, borderRadius: 48 },
+  avatarPickerPlaceholder: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#f0faf6', borderWidth: 2, borderColor: GREEN, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  avatarPickerIcon: { fontSize: 28, marginBottom: 4 },
+  avatarPickerText: { fontSize: 11, color: GREEN, fontWeight: '600' },
+
+  // Avatar edit hint in profile
+  avatarEditHint: { fontSize: 11, color: '#aaa', textAlign: 'center', marginTop: 4 },
 })
