@@ -1,0 +1,4 @@
+
+# local patch backups
+*.bak
+*.bak[0-9]
