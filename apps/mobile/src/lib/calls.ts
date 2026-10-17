@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { AppState } from 'react-native'
 import { supabase } from './supabase'
 
 // Flip to true once the voice engine (LiveKit) is wired in.
@@ -71,6 +72,29 @@ export function useCalls(userId: string | undefined): CallsApi {
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+  }, [userId])
+
+  // coming back from background (e.g. after tapping a call notification): re-check for a live call
+  useEffect(() => {
+    if (!userId) return
+    const sub = AppState.addEventListener('change', async (st) => {
+      if (st !== 'active') return
+      const { data } = await supabase.from('calls').select('*')
+        .or(`caller_id.eq.${userId},callee_id.eq.${userId}`)
+        .in('status', ['ringing', 'active'])
+        .order('created_at', { ascending: false }).limit(1)
+      const row = data?.[0] as CallRow | undefined
+      if (row && fresh(row)) {
+        if (currentRef.current?.id !== row.id) {
+          setCurrent(row)
+          loadPeer(row.caller_id === userId ? row.callee_id : row.caller_id)
+        }
+      } else if (currentRef.current && !row) {
+        setCurrent(null)
+        setPeer(null)
+      }
+    })
+    return () => sub.remove()
   }, [userId])
 
   // caller gives up after 45 s; callee's screen drops itself after 60 s

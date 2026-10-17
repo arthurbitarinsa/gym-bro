@@ -20,6 +20,9 @@ import { useCalls, NEEDED_MESSAGES, type CallsApi } from './src/lib/calls'
 import { callStrings } from './src/lib/callStrings'
 import { CallLayer, CallLockedSheet } from './src/screens/CallUI'
 import { inboxStrings } from './src/lib/inboxStrings'
+import { usePush, unregisterPush, type PushTap } from './src/lib/push'
+import { useSpotter } from './src/lib/spotter'
+import { SpotterFab, SpotterSheet } from './src/screens/SpotterUI'
 import UserActionsSheet, { safetyStrings } from './src/screens/SafetySheet'
 import { getHiddenIds } from './src/lib/safety'
 import { PRIVACY_URL, TERMS_URL } from './src/lib/links'
@@ -1168,6 +1171,24 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
     setActiveChat({ matchId, otherUser })
   }
 
+  async function handlePushTap(d: PushTap) {
+    setShowSettings(false); setShowMembers(false); setViewUser(null)
+    if (d.type === 'message' && d.matchId) {
+      const { data: m } = await supabase
+        .from('matches')
+        .select('*, user_a_profile:profiles!matches_user_a_fkey(*), user_b_profile:profiles!matches_user_b_fkey(*)')
+        .eq('id', d.matchId).single()
+      if (m) openChat(m.id, m.user_a === session?.user.id ? m.user_b_profile : m.user_a_profile)
+    } else if (d.type === 'match') {
+      setActiveChat(null); setActiveTab('matches')
+    } else if (d.type === 'spotter') {
+      setActiveChat(null); setShowSpotter(true)
+    }
+  }
+  usePush(session?.user.id, handlePushTap, inbox.unreadTotal)
+  const [showSpotter, setShowSpotter] = useState(false)
+  const spotter = useSpotter(session?.user.id, !!(profile?.gym_id || profile?.temp_gym_id))
+
   useEffect(() => { loadProfile() }, [])
 
   async function loadProfile() {
@@ -1193,6 +1214,7 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
   }
 
   async function signOut() {
+    await unregisterPush()
     await supabase.auth.signOut()
     onSignOut()
   }
@@ -1264,6 +1286,8 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
       {activeTab === 'chats' && <ChatsTab lang={lang} conversations={inbox.all} myId={session?.user.id} onOpenChat={openChat} onOpenProfile={setViewUser} />}
       {activeTab === 'matches' && <MatchesTab t={t} lang={lang} session={session} onChanged={inbox.refresh} onOpenProfile={setViewUser} />}
       {activeTab === 'profile' && <ProfileTab t={t} lang={lang} connections={inbox.all} onFindPartner={() => setActiveTab('discover')} onOpenConnections={() => setActiveTab('chats')} onOpenMembers={() => setShowMembers(true)} onOpenProfile={setViewUser} profile={profile} onOpenSettings={() => setShowSettings(true)} onProfileUpdate={loadProfile} uploadAvatar={uploadAvatar} TempGymPicker={TempGymPickerModal} />}
+      {!!activeGymId && <SpotterFab lang={lang} count={spotter.open.length} active={!!spotter.mine} onPress={() => setShowSpotter(true)} />}
+      {showSpotter && <SpotterSheet lang={lang} spotter={spotter} gymName={activeGymInfo?.name || ''} onClose={() => setShowSpotter(false)} />}
       <View style={styles.tabBar}>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('discover')}>
           <Text style={[styles.tabIcon, activeTab === 'discover' && styles.tabActive]}>🔍</Text>
