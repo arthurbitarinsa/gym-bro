@@ -1263,7 +1263,7 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
       {activeTab === 'discover' && <DiscoverTab t={t} lang={lang} onOpenProfile={setViewUser} session={session} profile={profile} activeGymId={activeGymId} activeGymInfo={activeGymInfo} isVisiting={tempActive} />}
       {activeTab === 'chats' && <ChatsTab lang={lang} conversations={inbox.all} myId={session?.user.id} onOpenChat={openChat} onOpenProfile={setViewUser} />}
       {activeTab === 'matches' && <MatchesTab t={t} lang={lang} session={session} onChanged={inbox.refresh} onOpenProfile={setViewUser} />}
-      {activeTab === 'profile' && <ProfileTab t={t} lang={lang} connections={inbox.all} onFindPartner={() => setActiveTab('discover')} onOpenConnections={() => setActiveTab('chats')} onOpenMembers={() => setShowMembers(true)} profile={profile} onOpenSettings={() => setShowSettings(true)} onProfileUpdate={loadProfile} uploadAvatar={uploadAvatar} TempGymPicker={TempGymPickerModal} />}
+      {activeTab === 'profile' && <ProfileTab t={t} lang={lang} connections={inbox.all} onFindPartner={() => setActiveTab('discover')} onOpenConnections={() => setActiveTab('chats')} onOpenMembers={() => setShowMembers(true)} onOpenProfile={setViewUser} profile={profile} onOpenSettings={() => setShowSettings(true)} onProfileUpdate={loadProfile} uploadAvatar={uploadAvatar} TempGymPicker={TempGymPickerModal} />}
       <View style={styles.tabBar}>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('discover')}>
           <Text style={[styles.tabIcon, activeTab === 'discover' && styles.tabActive]}>🔍</Text>

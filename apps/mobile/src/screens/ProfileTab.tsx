@@ -43,6 +43,7 @@ type Props = {
   onFindPartner: () => void
   onOpenConnections: () => void
   onOpenMembers: () => void
+  onOpenProfile: (user: any) => void
   profile: any
   onOpenSettings: () => void
   onProfileUpdate: () => void
@@ -50,7 +51,7 @@ type Props = {
   TempGymPicker: ComponentType<{ t: Record<string, string>, profile: any, onClose: () => void, onSaved: () => void }>
 }
 
-export default function ProfileTab({ t, lang, connections, onFindPartner, onOpenConnections, onOpenMembers, profile, onOpenSettings, onProfileUpdate, uploadAvatar, TempGymPicker }: Props) {
+export default function ProfileTab({ t, lang, connections, onFindPartner, onOpenConnections, onOpenMembers, onOpenProfile, profile, onOpenSettings, onProfileUpdate, uploadAvatar, TempGymPicker }: Props) {
   const [showTempGymPicker, setShowTempGymPicker] = useState(false)
   const [members, setMembers] = useState<number | null>(null)
   const x = inboxStrings(lang)
@@ -248,12 +249,12 @@ export default function ProfileTab({ t, lang, connections, onFindPartner, onOpen
                 {connections.map(c => {
                   const nm = c.other?.full_name || c.other?.username || '?'
                   return (
-                    <View key={c.matchId} style={{ alignItems: 'center', width: 64 }}>
+                    <TouchableOpacity key={c.matchId} activeOpacity={0.7} onPress={() => onOpenProfile(c.other)} style={{ alignItems: 'center', width: 64 }}>
                       {c.other?.avatar_url
                         ? <Image source={{ uri: c.other.avatar_url }} style={s.circleAvatar} />
                         : <View style={[s.circleAvatar, { backgroundColor: GREEN, justifyContent: 'center', alignItems: 'center' }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 20 }}>{nm[0].toUpperCase()}</Text></View>}
                       <Text style={s.circleName} numberOfLines={1}>{nm.split(' ')[0]}</Text>
-                    </View>
+                    </TouchableOpacity>
                   )
                 })}
               </ScrollView>
