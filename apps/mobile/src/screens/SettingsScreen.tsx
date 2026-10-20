@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Constants from 'expo-constants'
 import { supabase } from '../lib/supabase'
+import { useGymSearch } from '../lib/gymSearch'
 import { PRIVACY_URL, TERMS_URL, SUPPORT_EMAIL } from '../lib/links'
 import BlockedUsers from './BlockedUsers'
 import { safetyStrings } from './SafetySheet'
@@ -338,18 +339,12 @@ function EditProfile({ t, s, profile, onBack, onSaved }: {
   const [level, setLevel] = useState<string>(profile?.experience_level || '')
   const [gymId, setGymId] = useState<string>(profile?.gym_id || '')
   const [gymName, setGymName] = useState<string>(profile?.gyms?.name || '')
-  const [gyms, setGyms] = useState<{ id: string, name: string, city: string }[]>([])
   const [pickingGym, setPickingGym] = useState(false)
   const [search, setSearch] = useState('')
+  const { gyms } = useGymSearch(search, gymId)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    supabase.from('gyms').select('id, name, city').order('city').then(({ data }) => { if (data) setGyms(data) })
-  }, [])
-
-  const filteredGyms = search.length > 0
-    ? gyms.filter(g => g.name.toLowerCase().includes(search.toLowerCase()) || g.city.toLowerCase().includes(search.toLowerCase()))
-    : gyms
+  const filteredGyms = gyms
 
   async function handleSave() {
     const cleanName = fullName.trim()

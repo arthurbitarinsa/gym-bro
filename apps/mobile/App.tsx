@@ -10,6 +10,7 @@ import { KeyboardRoot } from './src/lib/keyboard'
 import * as ImagePicker from 'expo-image-picker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from './src/lib/supabase'
+import { useGymSearch } from './src/lib/gymSearch'
 import SettingsScreen from './src/screens/SettingsScreen'
 import ProfileTab from './src/screens/ProfileTab'
 import { CityChips, SelectionDock } from './src/screens/GymPickerBits'
@@ -1063,18 +1064,14 @@ function OnboardingTraining({ t, onNext, onBack, session }: { t: Record<string,s
 
 function OnboardingGym({ t, onNext, onBack, session }: { t: Record<string,string>, onNext: () => void, onBack: () => void, session: Session | null }) {
   const [selectedGymId, setSelectedGymId] = useState('')
-  const [gyms, setGyms] = useState<{ id: string, name: string, city: string }[]>([])
   const [search, setSearch] = useState('')
   const [customGym, setCustomGym] = useState('')
   const [cityFilter, setCityFilter] = useState('')
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    supabase.from('gyms').select('id, name, city').order('city').then(({ data }) => { if (data) setGyms(data) })
-  }, [])
+  const { gyms, busy: gymsBusy } = useGymSearch(search, selectedGymId)
 
   const isOther = gyms.find(g => g.id === selectedGymId)?.name === 'Other / My gym is not listed'
-  const searched = search.length > 0 ? gyms.filter(g => g.name.toLowerCase().includes(search.toLowerCase()) || g.city.toLowerCase().includes(search.toLowerCase())) : gyms
+  const searched = gyms
   const allCities = [...new Set(searched.map(g => g.city))]
   const cityCounts: Record<string, number> = {}
   searched.forEach(g => { cityCounts[g.city] = (cityCounts[g.city] || 0) + 1 })
@@ -1115,7 +1112,7 @@ function OnboardingGym({ t, onNext, onBack, session }: { t: Record<string,string
         <Text style={styles.stepSub}>{t.gym_sub}</Text>
         <TextInput style={[styles.input, { marginBottom: 12 }]} placeholder={t.search_gym} placeholderTextColor="#999" value={search} onChangeText={setSearch} />
         <CityChips cities={allCities} counts={cityCounts} selected={activeCity} onSelect={setCityFilter} allLabel="All" />
-        {gyms.length === 0 && <ActivityIndicator color="#1D9E75" style={{ marginTop: 20 }} />}
+        {gymsBusy && <ActivityIndicator color="#1D9E75" style={{ marginTop: 20 }} />}
         {cities.map(city => (
           <View key={city}>
             <Text style={styles.sectionLabel}>{city}</Text>
@@ -1677,19 +1674,13 @@ function TempGymPickerModal({ t, profile, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
-  const [gyms, setGyms] = useState<{ id: string, name: string, city: string }[]>([])
   const [search, setSearch] = useState('')
   const [selectedGymId, setSelectedGymId] = useState('')
+  const { gyms } = useGymSearch(search, selectedGymId)
   const [duration, setDuration] = useState<1 | 3 | 7>(1)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    supabase.from('gyms').select('id, name, city').order('city').then(({ data }) => { if (data) setGyms(data) })
-  }, [])
-
-  const filteredGyms = search.length > 0
-    ? gyms.filter(g => g.name.toLowerCase().includes(search.toLowerCase()) || g.city.toLowerCase().includes(search.toLowerCase()))
-    : gyms
+  const filteredGyms = gyms
 
   async function handleSave() {
     if (!selectedGymId) { Alert.alert(t.error, t.select_gym); return }
