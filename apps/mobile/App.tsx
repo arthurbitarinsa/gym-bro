@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, KeyboardAvoidingView, Platform, ScrollView,
-  ActivityIndicator, SafeAreaView, FlatList, Image, Linking
+  ActivityIndicator, FlatList, Image, Linking
 } from 'react-native'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import { KeyboardRoot } from './src/lib/keyboard'
 import * as ImagePicker from 'expo-image-picker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from './src/lib/supabase'
@@ -12,6 +14,7 @@ import SettingsScreen from './src/screens/SettingsScreen'
 import ProfileTab from './src/screens/ProfileTab'
 import { CityChips, SelectionDock } from './src/screens/GymPickerBits'
 import ChatsTab from './src/screens/ChatsTab'
+import PhotoViewer from './src/screens/PhotoViewer'
 import GymMembers from './src/screens/GymMembers'
 import UserProfile from './src/screens/UserProfile'
 import MessageBanner from './src/screens/MessageBanner'
@@ -23,6 +26,8 @@ import { inboxStrings } from './src/lib/inboxStrings'
 import { usePush, unregisterPush, type PushTap } from './src/lib/push'
 import { useSpotter } from './src/lib/spotter'
 import { SpotterFab, SpotterSheet } from './src/screens/SpotterUI'
+import { useSessions, type SessionsApi } from './src/lib/sessions'
+import { SessionBar } from './src/screens/SessionUI'
 import UserActionsSheet, { safetyStrings } from './src/screens/SafetySheet'
 import { getHiddenIds } from './src/lib/safety'
 import { PRIVACY_URL, TERMS_URL } from './src/lib/links'
@@ -727,6 +732,16 @@ const T: Record<string, Record<string, string>> = {
 type Screen = 'loading' | 'language' | 'auth' | 'onboarding_basic' | 'onboarding_training' | 'onboarding_gym' | 'main'
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <KeyboardRoot>
+        <AppInner />
+      </KeyboardRoot>
+    </SafeAreaProvider>
+  )
+}
+
+function AppInner() {
   const [screen, setScreen] = useState<Screen>('loading')
   const [session, setSession] = useState<Session | null>(null)
   const [lang, setLang] = useState('en')
@@ -855,7 +870,7 @@ function AuthScreen({ t, lang, onAuth }: { t: Record<string,string>, lang: strin
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar style="light" />
       <View style={styles.authHero}>
         <View style={styles.authLogoWrap}>
@@ -1173,7 +1188,7 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
 
   async function handlePushTap(d: PushTap) {
     setShowSettings(false); setShowMembers(false); setViewUser(null)
-    if (d.type === 'message' && d.matchId) {
+    if ((d.type === 'message' || d.type === 'session') && d.matchId) {
       const { data: m } = await supabase
         .from('matches')
         .select('*, user_a_profile:profiles!matches_user_a_fkey(*), user_b_profile:profiles!matches_user_b_fkey(*)')
@@ -1186,6 +1201,7 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
     }
   }
   usePush(session?.user.id, handlePushTap, inbox.unreadTotal)
+  const sessions = useSessions(session?.user.id)
   const [showSpotter, setShowSpotter] = useState(false)
   const spotter = useSpotter(session?.user.id, !!(profile?.gym_id || profile?.temp_gym_id))
 
@@ -1228,7 +1244,7 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
   if (activeChat) {
     return (
       <View style={{ flex: 1 }}>
-        <ChatScreen key={activeChat.matchId} t={t} lang={lang} session={session} matchId={activeChat.matchId} otherUser={activeChat.otherUser} onCall={calls.start} callBusy={!!calls.current} onBack={() => { inbox.markRead(activeChat.matchId); inbox.refresh(); setActiveChat(null) }} />
+        <ChatScreen key={activeChat.matchId} sessions={sessions} t={t} lang={lang} session={session} matchId={activeChat.matchId} otherUser={activeChat.otherUser} onCall={calls.start} callBusy={!!calls.current} onBack={() => { inbox.markRead(activeChat.matchId); inbox.refresh(); setActiveChat(null) }} />
         {inbox.banner && <MessageBanner banner={inbox.banner} onOpen={() => openChat(inbox.banner!.matchId, inbox.banner!.other)} onDismiss={inbox.dismissBanner} />}
       </View>
     )
@@ -1283,7 +1299,7 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       {activeTab === 'discover' && <DiscoverTab t={t} lang={lang} onOpenProfile={setViewUser} session={session} profile={profile} activeGymId={activeGymId} activeGymInfo={activeGymInfo} isVisiting={tempActive} />}
-      {activeTab === 'chats' && <ChatsTab lang={lang} conversations={inbox.all} myId={session?.user.id} onOpenChat={openChat} onOpenProfile={setViewUser} />}
+      {activeTab === 'chats' && <ChatsTab lang={lang} conversations={inbox.all} myId={session?.user.id} onOpenChat={openChat} onOpenProfile={setViewUser} upcoming={sessions.upcoming} />}
       {activeTab === 'matches' && <MatchesTab t={t} lang={lang} session={session} onChanged={inbox.refresh} onOpenProfile={setViewUser} />}
       {activeTab === 'profile' && <ProfileTab t={t} lang={lang} connections={inbox.all} onFindPartner={() => setActiveTab('discover')} onOpenConnections={() => setActiveTab('chats')} onOpenMembers={() => setShowMembers(true)} onOpenProfile={setViewUser} profile={profile} onOpenSettings={() => setShowSettings(true)} onProfileUpdate={loadProfile} uploadAvatar={uploadAvatar} TempGymPicker={TempGymPickerModal} />}
       {!!activeGymId && <SpotterFab lang={lang} count={spotter.open.length} active={!!spotter.mine} onPress={() => setShowSpotter(true)} />}
@@ -1318,12 +1334,13 @@ function MainScreenInner({ t, lang, onLanguageChange, session, onSignOut, calls 
   )
 }
 
-function ChatScreen({ t, lang, session, matchId, otherUser, onBack, onCall, callBusy }: { t: Record<string,string>, lang: string, session: Session | null, matchId: string, otherUser: any, onBack: () => void, onCall: (matchId: string, other: any) => Promise<string | null>, callBusy: boolean }) {
+function ChatScreen({ t, lang, session, matchId, otherUser, onBack, onCall, callBusy, sessions }: { sessions: SessionsApi, t: Record<string,string>, lang: string, session: Session | null, matchId: string, otherUser: any, onBack: () => void, onCall: (matchId: string, other: any) => Promise<string | null>, callBusy: boolean }) {
   const [messages, setMessages] = useState<any[]>([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [showActions, setShowActions] = useState(false)
+  const [showPhoto, setShowPhoto] = useState(false)
   const [showLocked, setShowLocked] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
   const myCount = messages.filter(m => m.sender_id === session?.user.id).length
@@ -1381,7 +1398,10 @@ function ChatScreen({ t, lang, session, matchId, otherUser, onBack, onCall, call
           <Text style={styles.chatBackText}>←</Text>
         </TouchableOpacity>
         <View style={styles.chatHeaderInfo}>
-          <Avatar url={otherUser?.avatar_url} name={otherUser?.full_name || otherUser?.username} size={38} />
+          <TouchableOpacity activeOpacity={otherUser?.avatar_url ? 0.8 : 1} onPress={() => { if (otherUser?.avatar_url) setShowPhoto(true) }}>
+            <Avatar url={otherUser?.avatar_url} name={otherUser?.full_name || otherUser?.username} size={38} />
+          </TouchableOpacity>
+          {showPhoto && !!otherUser?.avatar_url && <PhotoViewer uri={otherUser.avatar_url} name={otherUser?.full_name || otherUser?.username} onClose={() => setShowPhoto(false)} />}
           <View>
             <Text style={styles.chatHeaderName}>{otherUser?.full_name || otherUser?.username}</Text>
             <Text style={styles.chatHeaderSub}>@{otherUser?.username}</Text>
@@ -1394,6 +1414,7 @@ function ChatScreen({ t, lang, session, matchId, otherUser, onBack, onCall, call
           <Text style={{ fontSize: 22, color: '#888', fontWeight: '800' }}>⋯</Text>
         </TouchableOpacity>
       </View>
+      {!!session && <SessionBar lang={lang} myId={session.user.id} matchId={matchId} otherName={otherUser?.full_name || otherUser?.username || ''} sessions={sessions} />}
       {loading ? <View style={styles.center}><ActivityIndicator color="#1D9E75" /></View> : (
         <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.messagesList} keyboardShouldPersistTaps="handled">
           {messages.length === 0 && (
@@ -1416,7 +1437,7 @@ function ChatScreen({ t, lang, session, matchId, otherUser, onBack, onCall, call
           })}
         </ScrollView>
       )}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.chatInputRow}>
           <TextInput style={styles.chatInput} placeholder={t.message_placeholder} placeholderTextColor="#999" value={text} onChangeText={setText} multiline maxLength={500} />
           <TouchableOpacity style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]} onPress={sendMessage} disabled={!text.trim() || sending} activeOpacity={0.8}>

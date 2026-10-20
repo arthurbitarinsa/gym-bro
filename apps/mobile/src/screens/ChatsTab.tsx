@@ -1,6 +1,8 @@
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet } from 'react-native'
 import type { Conversation } from '../lib/inbox'
 import { inboxStrings } from '../lib/inboxStrings'
+import type { SessionRow } from '../lib/sessions'
+import { UpcomingStrip } from './SessionUI'
 
 const GREEN = '#1D9E75'
 const DEEP = '#0E6B4F'
@@ -24,7 +26,8 @@ function when(iso: string): string {
   return d.toLocaleDateString([], { day: 'numeric', month: 'short' })
 }
 
-export default function ChatsTab({ lang, conversations, myId, onOpenChat, onOpenProfile }: {
+export default function ChatsTab({ lang, conversations, myId, onOpenChat, onOpenProfile, upcoming = [] }: {
+  upcoming?: SessionRow[]
   lang: string
   conversations: Conversation[]
   myId: string | undefined
@@ -40,6 +43,8 @@ export default function ChatsTab({ lang, conversations, myId, onOpenChat, onOpen
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 20, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
       <Text style={st.title}>{s.chats}</Text>
+
+      <UpcomingStrip lang={lang} items={upcoming} myId={myId} onOpen={(matchId) => { const c = conversations.find(x => x.matchId === matchId); if (c) onOpenChat(c.matchId, c.other) }} />
 
       {fresh.length > 0 && (
         <View style={{ marginTop: 18 }}>

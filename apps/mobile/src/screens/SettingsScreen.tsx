@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView,
-  SafeAreaView, ActivityIndicator, Linking, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Linking, KeyboardAvoidingView, Platform,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import Constants from 'expo-constants'
 import { supabase } from '../lib/supabase'
 import { PRIVACY_URL, TERMS_URL, SUPPORT_EMAIL } from '../lib/links'

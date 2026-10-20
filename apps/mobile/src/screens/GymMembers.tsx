@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, Image, SafeAreaView, ActivityIndicator, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, StyleSheet } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { getHiddenIds } from '../lib/safety'
 import { inboxStrings } from '../lib/inboxStrings'

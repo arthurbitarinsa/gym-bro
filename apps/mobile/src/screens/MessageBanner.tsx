@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Animated, View, Text, TouchableOpacity, Image, SafeAreaView, StyleSheet } from 'react-native'
+import { Animated, View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import type { Banner } from '../lib/inbox'
 
 const GREEN = '#1D9E75'

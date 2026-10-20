@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, Image, SafeAreaView, ActivityIndicator, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, StyleSheet } from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { inboxStrings } from '../lib/inboxStrings'
 import UserActionsSheet from './SafetySheet'
+import PhotoViewer from './PhotoViewer'
 
 const GREEN = '#1D9E75'
 const DEEP = '#0E6B4F'
@@ -33,7 +35,9 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
   onOpenChat: (matchId: string, other: any) => void
   onChanged: () => void
 }) {
+  const insets = useSafeAreaInsets()
   const x = inboxStrings(lang)
+  const [showPhoto, setShowPhoto] = useState(false)
   const [p, setP] = useState<any>(user)
   const [home, setHome] = useState<any>(null)
   const [temp, setTemp] = useState<any>(null)
@@ -115,7 +119,7 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
 
           <View style={st.avatarWrap}>
             {p?.avatar_url
-              ? <Image source={{ uri: p.avatar_url }} style={st.avatarImg} />
+              ? <TouchableOpacity activeOpacity={0.9} onPress={() => setShowPhoto(true)}><Image source={{ uri: p.avatar_url }} style={st.avatarImg} /></TouchableOpacity>
               : (
                 <View style={[st.avatarImg, { backgroundColor: MINT, justifyContent: 'center', alignItems: 'center' }]}>
                   <Text style={{ color: GREEN, fontSize: 38, fontWeight: '800' }}>{name[0].toUpperCase()}</Text>
@@ -123,6 +127,7 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
               )}
           </View>
 
+          {showPhoto && !!p?.avatar_url && <PhotoViewer uri={p.avatar_url} name={name} onClose={() => setShowPhoto(false)} />}
           <Text style={st.name} numberOfLines={1}>{name}</Text>
           <View style={st.userPill}><Text style={st.userPillText}>@{p?.username}</Text></View>
 
@@ -180,7 +185,7 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
       </ScrollView>
 
       {/* Action bar */}
-      <View style={st.bar}>
+      <View style={[st.bar, { paddingBottom: Math.max(28, insets.bottom + 12) }]}>
         {state === 'in' && <Text style={st.barHint}>{name.split(' ')[0]} {x.wants_you}</Text>}
         {state === 'accepted' && (
           <TouchableOpacity style={st.cta} activeOpacity={0.85} onPress={() => match && onOpenChat(match.id, p)}>

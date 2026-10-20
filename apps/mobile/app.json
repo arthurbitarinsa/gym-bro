@@ -54,7 +54,7 @@
     },
     "owner": "arthurbitarinsa",
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "updates": {
       "url": "https://u.expo.dev/decca98f-3b55-4e1b-8e52-01fc0d96090f"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   View, Text, TouchableOpacity, Image, Modal, ScrollView, TextInput, Switch, Alert,
   KeyboardAvoidingView, Platform, StyleSheet,
@@ -48,6 +49,7 @@ export function SpotterSheet({ lang, spotter, gymName, onClose }: {
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(Date.now())
   const { mine, open } = spotter
+  const insets = useSafeAreaInsets()
 
   useEffect(() => {
     spotter.refresh()
@@ -85,7 +87,7 @@ export function SpotterSheet({ lang, spotter, gymName, onClose }: {
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <TouchableOpacity style={st.backdrop} activeOpacity={1} onPress={onClose} />
-        <View style={st.sheet}>
+        <View style={[st.sheet, { paddingBottom: insets.bottom }]}>
           <View style={st.grab} />
           <View style={st.head}>
             <View>

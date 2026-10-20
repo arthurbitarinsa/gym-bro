@@ -1,0 +1,267 @@
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, StyleSheet } from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { supabase } from '../lib/supabase'
+import { inboxStrings } from '../lib/inboxStrings'
+import UserActionsSheet from './SafetySheet'
+
+const GREEN = '#1D9E75'
+const DEEP = '#0E6B4F'
+const MINT = '#f0faf6'
+const AMBER = '#FF9800'
+const AMBER_BG = '#fff8f0'
+
+const AVATAR = 96
+const BAND = 92
+const RINGS = [
+  { r: 70, line: 'rgba(255,255,255,0.28)' },
+  { r: 104, line: 'rgba(255,255,255,0.18)' },
+  { r: 142, line: 'rgba(255,255,255,0.11)' },
+  { r: 184, line: 'rgba(255,255,255,0.06)' },
+]
+const LEVELS = ['beginner', 'intermediate', 'advanced']
+const GOAL_EMOJI: Record<string, string> = { strength: '🏋️', hypertrophy: '💪', cardio: '🏃', sport: '⚽', general: '✨' }
+
+type Match = { id: string, status: string, initiated_by: string } | null
+
+// Someone else's profile: check them out before connecting or accepting.
+export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, onChanged }: {
+  t: Record<string, string>
+  lang: string
+  myId: string | undefined
+  user: any
+  onBack: () => void
+  onOpenChat: (matchId: string, other: any) => void
+  onChanged: () => void
+}) {
+  const insets = useSafeAreaInsets()
+  const x = inboxStrings(lang)
+  const [p, setP] = useState<any>(user)
+  const [home, setHome] = useState<any>(null)
+  const [temp, setTemp] = useState<any>(null)
+  const [match, setMatch] = useState<Match>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [showActions, setShowActions] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      if (!user?.id || !myId) { setLoading(false); return }
+      const [{ data: prof }, { data: m }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('matches').select('id, status, initiated_by')
+          .or(`and(user_a.eq.${myId},user_b.eq.${user.id}),and(user_a.eq.${user.id},user_b.eq.${myId})`)
+          .maybeSingle(),
+      ])
+      const full = prof || user
+      setP(full)
+      setMatch((m as Match) || null)
+      const ids = [full.gym_id, full.temp_gym_id].filter(Boolean)
+      if (ids.length) {
+        const { data: gyms } = await supabase.from('gyms').select('id, name, city').in('id', ids)
+        setHome(gyms?.find(g => g.id === full.gym_id) || null)
+        setTemp(gyms?.find(g => g.id === full.temp_gym_id) || null)
+      }
+      setLoading(false)
+    })()
+  }, [user?.id, myId])
+
+  const name = p?.full_name || p?.username || '?'
+  const visiting = !!(p?.temp_gym_id && p?.temp_gym_expires_at && new Date(p.temp_gym_expires_at) > new Date())
+  const goal: string = p?.training_goal || ''
+  const levelIdx = LEVELS.indexOf(p?.experience_level) + 1
+  const joined = p?.created_at ? new Date(p.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' }) : null
+
+  const state: 'none' | 'out' | 'in' | 'accepted' =
+    !match ? 'none' : match.status === 'accepted' ? 'accepted' : match.initiated_by === myId ? 'out' : 'in'
+
+  async function connect() {
+    setBusy(true)
+    const { data, error } = await supabase.from('matches')
+      .insert({ user_a: myId, user_b: p.id, initiated_by: myId, status: 'pending' })
+      .select('id, status, initiated_by').single()
+    if (!error && data) { setMatch(data as Match); onChanged() }
+    else if (error?.message.includes('duplicate')) setMatch({ id: '', status: 'pending', initiated_by: myId! })
+    setBusy(false)
+  }
+
+  async function accept() {
+    if (!match?.id) return
+    setBusy(true)
+    const { error } = await supabase.from('matches').update({ status: 'accepted' }).eq('id', match.id)
+    if (!error) { setMatch({ ...match, status: 'accepted' }); onChanged() }
+    setBusy(false)
+  }
+
+  return (
+    <SafeAreaView style={st.container}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 130 }} showsVerticalScrollIndicator={false}>
+        <View style={st.hero}>
+          <View style={st.band}>
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              {RINGS.map(ring => (
+                <View key={ring.r} style={{
+                  position: 'absolute', left: '50%', marginLeft: -ring.r, top: BAND - ring.r,
+                  width: ring.r * 2, height: ring.r * 2, borderRadius: ring.r,
+                  borderWidth: 1.5, borderColor: ring.line,
+                }} />
+              ))}
+            </View>
+            <TouchableOpacity style={[st.roundBtn, { left: 12 }]} onPress={onBack} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={{ fontSize: 26, color: '#fff', marginTop: -3 }}>‹</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[st.roundBtn, { right: 12 }]} onPress={() => setShowActions(true)} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={{ fontSize: 20, color: '#fff', fontWeight: '800', marginTop: -4 }}>⋯</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={st.avatarWrap}>
+            {p?.avatar_url
+              ? <Image source={{ uri: p.avatar_url }} style={st.avatarImg} />
+              : (
+                <View style={[st.avatarImg, { backgroundColor: MINT, justifyContent: 'center', alignItems: 'center' }]}>
+                  <Text style={{ color: GREEN, fontSize: 38, fontWeight: '800' }}>{name[0].toUpperCase()}</Text>
+                </View>
+              )}
+          </View>
+
+          <Text style={st.name} numberOfLines={1}>{name}</Text>
+          <View style={st.userPill}><Text style={st.userPillText}>@{p?.username}</Text></View>
+
+          {visiting && (
+            <View style={st.visitPill}>
+              <Text style={st.visitPillText}>{t.visiting}{temp?.name ? ` · ${temp.name}` : ''}</Text>
+            </View>
+          )}
+          <Text style={[st.bio, !p?.bio && { color: '#aab6b1', fontStyle: 'italic' }]}>{p?.bio || x.no_bio}</Text>
+        </View>
+
+        {loading && <ActivityIndicator color={GREEN} style={{ marginTop: 20 }} />}
+
+        {/* Visiting card */}
+        {visiting && (
+          <View style={st.visitCard}>
+            <Text style={{ fontSize: 22 }}>✈️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={st.visitTitle}>{temp?.name || '—'}</Text>
+              <Text style={st.visitSub}>
+                {x.visiting_until} {new Date(p.temp_gym_expires_at).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                {home?.name ? `  ·  ${x.visiting_from} ${home.name}` : ''}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Home gym */}
+        <View style={st.gymCard}>
+          <View style={st.gymIcon}><Text style={{ fontSize: 22 }}>🏋️</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.smallLabel}>{t.home_gym}</Text>
+            <Text style={st.gymName} numberOfLines={1}>{home?.name || '—'}</Text>
+            {home?.city ? <Text style={st.gymCity}>{home.city}</Text> : null}
+          </View>
+        </View>
+
+        {/* Goal + level */}
+        <View style={st.row}>
+          <View style={st.tile}>
+            <View style={st.goalBubble}><Text style={{ fontSize: 20 }}>{GOAL_EMOJI[goal] || '✨'}</Text></View>
+            <Text style={st.smallLabel}>{t.primary_goal}</Text>
+            <Text style={st.tileValue} numberOfLines={1}>{t[`goal_${goal}`] || '—'}</Text>
+          </View>
+          <View style={st.tile}>
+            <View style={st.plates}>
+              {[10, 16, 22].map((h, i) => <View key={i} style={[st.plate, { height: h }, i < levelIdx && { backgroundColor: GREEN }]} />)}
+            </View>
+            <Text style={st.smallLabel}>{t.experience_level}</Text>
+            <Text style={st.tileValue} numberOfLines={1}>{t[`level_${p?.experience_level}`] || '—'}</Text>
+          </View>
+        </View>
+
+        {joined ? <Text style={st.joined}>{x.stat_joined} {joined}</Text> : null}
+      </ScrollView>
+
+      {/* Action bar */}
+      <View style={[st.bar, { paddingBottom: Math.max(28, insets.bottom + 12) }]}>
+        {state === 'in' && <Text style={st.barHint}>{name.split(' ')[0]} {x.wants_you}</Text>}
+        {state === 'accepted' && (
+          <TouchableOpacity style={st.cta} activeOpacity={0.85} onPress={() => match && onOpenChat(match.id, p)}>
+            <Text style={st.ctaText}>💬  {x.message}</Text>
+          </TouchableOpacity>
+        )}
+        {state === 'in' && (
+          <TouchableOpacity style={[st.cta, busy && { opacity: 0.6 }]} activeOpacity={0.85} disabled={busy} onPress={accept}>
+            <Text style={st.ctaText}>{t.accept}</Text>
+          </TouchableOpacity>
+        )}
+        {state === 'out' && (
+          <View style={[st.cta, st.ctaSent]}><Text style={[st.ctaText, { color: GREEN }]}>{t.request_sent}</Text></View>
+        )}
+        {state === 'none' && (
+          <TouchableOpacity style={[st.cta, (busy || loading) && { opacity: 0.6 }]} activeOpacity={0.85} disabled={busy || loading} onPress={connect}>
+            <Text style={st.ctaText}>{t.connect}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {showActions && (
+        <UserActionsSheet
+          lang={lang}
+          user={{ id: p.id, name }}
+          onClose={() => setShowActions(false)}
+          onBlocked={() => { onChanged(); onBack() }}
+        />
+      )}
+    </SafeAreaView>
+  )
+}
+
+const st = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff' },
+  hero: { alignItems: 'center' },
+  band: { width: '100%', height: BAND, backgroundColor: GREEN, borderRadius: 28, overflow: 'hidden' },
+  roundBtn: { position: 'absolute', top: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center' },
+  avatarWrap: { width: AVATAR, height: AVATAR, marginTop: -AVATAR / 2 },
+  avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, borderWidth: 4, borderColor: '#fff' },
+  name: { marginTop: 12, fontSize: 26, fontWeight: '800', color: '#1a1a1a', letterSpacing: -0.6, maxWidth: '100%' },
+  userPill: { marginTop: 6, backgroundColor: MINT, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
+  userPillText: { color: GREEN, fontSize: 14, fontWeight: '700' },
+  visitPill: { marginTop: 8, backgroundColor: AMBER_BG, borderColor: AMBER, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
+  visitPillText: { color: AMBER, fontSize: 13, fontWeight: '700' },
+  bio: { marginTop: 12, color: '#5f6f69', fontSize: 15, lineHeight: 22, textAlign: 'center', maxWidth: 300 },
+
+  visitCard: {
+    marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: AMBER_BG, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: '#ffe2b8',
+  },
+  visitTitle: { fontSize: 16, fontWeight: '800', color: '#7a4a00' },
+  visitSub: { fontSize: 13, color: '#a0670c', marginTop: 3, lineHeight: 18 },
+
+  gymCard: {
+    marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: '#fff', borderRadius: 22, padding: 16, borderWidth: 1, borderColor: '#e3f2ec',
+    shadowColor: DEEP, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+  },
+  gymIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: MINT, justifyContent: 'center', alignItems: 'center' },
+  smallLabel: { fontSize: 12, color: '#8a9a94', fontWeight: '500' },
+  gymName: { fontSize: 17, fontWeight: '700', color: '#1a1a1a', marginTop: 2 },
+  gymCity: { fontSize: 13, color: '#8a9a94', marginTop: 1 },
+
+  row: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  tile: { flex: 1, backgroundColor: MINT, borderRadius: 22, padding: 16, minHeight: 124, justifyContent: 'flex-end' },
+  goalBubble: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  tileValue: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', marginTop: 2 },
+  plates: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 40, marginBottom: 14 },
+  plate: { width: 11, borderRadius: 4, backgroundColor: '#d3e6de' },
+  joined: { marginTop: 18, textAlign: 'center', fontSize: 13, color: '#9aa8a2' },
+
+  bar: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 28,
+    backgroundColor: 'rgba(255,255,255,0.97)', borderTopWidth: 1, borderTopColor: '#f0f0f0',
+  },
+  barHint: { textAlign: 'center', fontSize: 13.5, color: '#5f6f69', marginBottom: 10 },
+  cta: { backgroundColor: GREEN, borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
+  ctaSent: { backgroundColor: MINT },
+  ctaText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+})
