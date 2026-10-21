@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { useRestTimer } from '../lib/restTimer'
 import { restStrings } from '../lib/restStrings'
 
 const GREEN = '#1D9E75'
@@ -14,11 +13,10 @@ function mmss(s: number) {
   return `${m}:${r < 10 ? '0' : ''}${r}`
 }
 
-// Shared rest timer, shown just above the "Add lift" button.
-export function RestBar({ lang, matchId, myId, first }: { lang: string, matchId: string, myId: string, first: string }) {
+// The running countdown / "Go!" banner. Pinned under the Logbook header, so it stays visible
+// on every screen of the Logbook (including while you add a lift).
+export function RestLive({ lang, t, myId, first }: { lang: string, t: any, myId: string, first: string }) {
   const R = restStrings(lang)
-  const t = useRestTimer(matchId, myId, { title: R.n_title, body: R.n_body })
-  const [open, setOpen] = useState(false)
 
   if (t.done) {
     return (
@@ -27,22 +25,28 @@ export function RestBar({ lang, matchId, myId, first }: { lang: string, matchId:
       </TouchableOpacity>
     )
   }
+  if (!t.rest) return null
 
-  if (t.rest) {
-    const mine = t.rest.by === myId
-    const pct = Math.max(0, Math.min(1, t.left / t.rest.total))
-    return (
-      <View style={[st.box, { backgroundColor: MINT }]}>
-        <View style={st.row}>
-          <Text style={st.time}>{mmss(t.left)}</Text>
-          <Text style={st.who} numberOfLines={2}>{(mine ? R.rest_me : R.rest_other).replace('{name}', first)}</Text>
-          <TouchableOpacity style={st.pill} onPress={() => t.addTime(15)} activeOpacity={0.8}><Text style={st.pillText}>{R.plus15}</Text></TouchableOpacity>
-          <TouchableOpacity style={[st.pill, st.pillStop]} onPress={t.stop} activeOpacity={0.8}><Text style={[st.pillText, { color: '#B23B3B' }]}>{R.stop}</Text></TouchableOpacity>
-        </View>
-        <View style={st.bar}><View style={[st.barFill, { width: `${Math.round(pct * 100)}%` }]} /></View>
+  const mine = t.rest.by === myId
+  const pct = Math.max(0, Math.min(1, t.left / t.rest.total))
+  return (
+    <View style={[st.box, { backgroundColor: MINT }]}>
+      <View style={st.row}>
+        <Text style={st.time}>{mmss(t.left)}</Text>
+        <Text style={st.who} numberOfLines={2}>{(mine ? R.rest_me : R.rest_other).replace('{name}', first)}</Text>
+        <TouchableOpacity style={st.pill} onPress={() => t.addTime(15)} activeOpacity={0.8}><Text style={st.pillText}>{R.plus15}</Text></TouchableOpacity>
+        <TouchableOpacity style={[st.pill, st.pillStop]} onPress={t.stop} activeOpacity={0.8}><Text style={[st.pillText, { color: '#B23B3B' }]}>{R.stop}</Text></TouchableOpacity>
       </View>
-    )
-  }
+      <View style={st.bar}><View style={[st.barFill, { width: `${Math.round(pct * 100)}%` }]} /></View>
+    </View>
+  )
+}
+
+// The "Rest together" button and its presets, shown above Add lift while nothing is running.
+export function RestIdle({ lang, t }: { lang: string, t: any }) {
+  const R = restStrings(lang)
+  const [open, setOpen] = useState(false)
+  if (t.rest || t.done) return null
 
   if (!open) {
     return (
@@ -51,7 +55,6 @@ export function RestBar({ lang, matchId, myId, first }: { lang: string, matchId:
       </TouchableOpacity>
     )
   }
-
   return (
     <View style={[st.box, { backgroundColor: MINT }]}>
       <View style={st.row}>

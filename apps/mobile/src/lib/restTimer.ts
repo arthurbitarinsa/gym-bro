@@ -62,8 +62,17 @@ export function useRestTimer(matchId: string, myId: string, note: { title: strin
         clearInterval(id)
         setRest(null)
         setDone(true)
-        haptic.pr()
         cancelNotif()
+        // Sound: only if the end just happened while the app is open (otherwise the scheduled notification already rang)
+        if (Date.now() - rest.endsAt < 3000) {
+          haptic.pr()
+          if (AppState.currentState === 'active') {
+            Notifications.scheduleNotificationAsync({
+              content: { title: noteRef.current.title, body: noteRef.current.body, sound: true, data: { type: 'rest' } } as any,
+              trigger: null,
+            }).catch(() => {})
+          }
+        }
         setTimeout(() => setDone(false), 6000)
       }
     }, 250)

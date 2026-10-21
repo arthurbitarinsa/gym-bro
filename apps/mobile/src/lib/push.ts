@@ -11,7 +11,8 @@ Notifications.setNotificationHandler({
   handleNotification: async (n) => {
     // spotter alerts are urgent and have no in-app banner, so they still show while the app is open
     const show = (n.request.content.data as any)?.type === 'spotter'
-    return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show, shouldSetBadge: false }
+    const rest = (n.request.content.data as any)?.type === 'rest' // rest timer over: sound only, no banner
+    return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show || rest, shouldSetBadge: false }
   },
 })
 

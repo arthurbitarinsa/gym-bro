@@ -11,7 +11,9 @@ import {
 import { logbookStrings, lfmt } from '../lib/logbookStrings'
 import { exerciseName, searchExercises, type Group } from '../lib/exercises'
 import { StreakCard } from './StreakUI'
-import { RestBar } from './RestUI'
+import { RestLive, RestIdle } from './RestUI'
+import { useRestTimer } from '../lib/restTimer'
+import { restStrings } from '../lib/restStrings'
 import { haptic } from '../lib/haptics'
 
 const GREEN = '#1D9E75'
@@ -106,6 +108,8 @@ export default function Logbook({ lang, matchId, myId, otherName, onClose }: {
 }) {
   const L = logbookStrings(lang)
   const first = otherName.split(' ')[0]
+  const rs = restStrings(lang)
+  const rt = useRestTimer(matchId, myId, { title: rs.n_title, body: rs.n_body })
   const lb = useLogbook(matchId)
   const insets = useContext(SafeAreaInsetsContext)
   const kb = useKb()
@@ -224,6 +228,8 @@ export default function Logbook({ lang, matchId, myId, otherName, onClose }: {
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}><Text style={st.close}>✕</Text></TouchableOpacity>
           </View>
 
+          <RestLive lang={lang} t={rt} myId={myId} first={first} />
+
           {adding ? (
             <SetBuilder lang={lang} myId={myId} first={first} lb={lb} recentKeys={recentKeys}
               preset={'key' in adding && adding.key ? (adding as Preset) : undefined} onDone={() => setAdding(null)} />
@@ -286,7 +292,7 @@ export default function Logbook({ lang, matchId, myId, otherName, onClose }: {
                   </>
                 )}
               </ScrollView>
-              <RestBar lang={lang} matchId={matchId} myId={myId} first={first} />
+              <RestIdle lang={lang} t={rt} />
               <TouchableOpacity style={st.addBtn} onPress={() => setAdding({})} activeOpacity={0.85}>
                 <Text style={st.addBtnText}>＋ {L.add}</Text>
               </TouchableOpacity>
