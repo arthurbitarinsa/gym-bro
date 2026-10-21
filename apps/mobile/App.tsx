@@ -24,6 +24,7 @@ import { useCalls, NEEDED_MESSAGES, type CallsApi } from './src/lib/calls'
 import { callStrings } from './src/lib/callStrings'
 import { CallLayer, CallLockedSheet } from './src/screens/CallUI'
 import { inboxStrings } from './src/lib/inboxStrings'
+import { askCancel, cancelStrings } from './src/lib/cancelRequest'
 import { usePush, unregisterPush, type PushTap } from './src/lib/push'
 import { useSpotter } from './src/lib/spotter'
 import { SpotterFab, SpotterSheet } from './src/screens/SpotterUI'
@@ -1473,9 +1474,24 @@ function DiscoverTab({ t, lang, onOpenProfile, session, profile, activeGymId, ac
   const [bros, setBros] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [sentRequests, setSentRequests] = useState<string[]>([])
+  const cx = cancelStrings(lang)
   const [actionsFor, setActionsFor] = useState<{ id: string, name: string } | null>(null)
 
-  useEffect(() => { loadBros() }, [activeGymId])
+  useEffect(() => { loadBros(); loadSent() }, [activeGymId])
+
+  // Remember which requests are still pending, so the button is right after a reload.
+  async function loadSent() {
+    const me = session?.user.id
+    if (!me) return
+    const { data } = await supabase.from('matches').select('user_a, user_b').eq('initiated_by', me).eq('status', 'pending')
+    if (data) setSentRequests(data.map((m: any) => (m.user_a === me ? m.user_b : m.user_a)))
+  }
+
+  function cancelSent(bro: any) {
+    askCancel(lang, bro.full_name || bro.username, bro.id, r => {
+      if (r === 'cancelled') setSentRequests(prev => prev.filter(x => x !== bro.id))
+    })
+  }
 
   async function loadBros() {
     if (!activeGymId) { setLoading(false); return }
@@ -1565,9 +1581,16 @@ function DiscoverTab({ t, lang, onOpenProfile, session, profile, activeGymId, ac
               {bro.training_goal && <View style={styles.tag}><Text style={styles.tagText}>{goalEmoji[bro.training_goal]} {bro.training_goal}</Text></View>}
               {bro.experience_level && <View style={[styles.tag, { borderColor: levelColor[bro.experience_level] }]}><Text style={[styles.tagText, { color: levelColor[bro.experience_level] }]}>{bro.experience_level}</Text></View>}
             </View>
-            <TouchableOpacity style={[styles.connectBtn, sent && styles.connectBtnSent]} onPress={() => !sent && sendRequest(bro.id)} activeOpacity={0.8}>
-              <Text style={[styles.connectBtnText, sent && styles.connectBtnTextSent]}>{sent ? t.request_sent : t.connect}</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={[styles.connectBtn, { flex: 1 }, sent && styles.connectBtnSent]} onPress={() => !sent && sendRequest(bro.id)} activeOpacity={sent ? 1 : 0.8}>
+                <Text style={[styles.connectBtnText, sent && styles.connectBtnTextSent]}>{sent ? t.request_sent : t.connect}</Text>
+              </TouchableOpacity>
+              {sent && (
+                <TouchableOpacity style={styles.cancelReqBtn} onPress={() => cancelSent(bro)} activeOpacity={0.7}>
+                  <Text style={styles.cancelReqText}>{cx.cancel_short}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )
       })}
@@ -1587,11 +1610,19 @@ function DiscoverTab({ t, lang, onOpenProfile, session, profile, activeGymId, ac
 
 function MatchesTab({ t, lang, session, onChanged, onOpenProfile }: { t: Record<string,string>, lang: string, session: Session | null, onChanged: () => void, onOpenProfile: (user: any) => void }) {
   const ix = inboxStrings(lang)
+  const cx = cancelStrings(lang)
   const [matches, setMatches] = useState<any[]>([])
   const [actionsFor, setActionsFor] = useState<{ id: string, name: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { loadMatches() }, [])
+  useEffect(() => {
+    loadMatches()
+    // Live: a request sent to me can be withdrawn while this list is open.
+    const ch = supabase.channel(`requests:${session?.user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => { loadMatches() })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
 
   async function loadMatches() {
     const { data } = await supabase
@@ -1604,6 +1635,15 @@ function MatchesTab({ t, lang, session, onChanged, onOpenProfile }: { t: Record<
       setMatches(data.filter(m => m.status !== 'accepted' && !hidden.includes(m.user_a === session?.user.id ? m.user_b : m.user_a)))
     }
     setLoading(false)
+  }
+
+  function cancelOutgoing(other: any, matchId: string) {
+    if (!other?.id) return
+    askCancel(lang, other.full_name || other.username || '', other.id, r => {
+      if (r === 'cancelled') setMatches(prev => prev.filter(m => m.id !== matchId))
+      else if (r === 'accepted') loadMatches()
+      if (r !== 'error') onChanged()
+    })
   }
 
   async function acceptMatch(matchId: string) {
@@ -1645,6 +1685,11 @@ function MatchesTab({ t, lang, session, onChanged, onOpenProfile }: { t: Record<
             {isIncoming && (
               <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptMatch(match.id)}>
                 <Text style={styles.acceptBtnText}>{t.accept}</Text>
+              </TouchableOpacity>
+            )}
+            {isPending && !isIncoming && (
+              <TouchableOpacity style={styles.cancelReqBtn} onPress={() => cancelOutgoing(other, match.id)} activeOpacity={0.7}>
+                <Text style={styles.cancelReqText}>{cx.cancel_short}</Text>
               </TouchableOpacity>
             )}
             {isAccepted && <Text style={{ fontSize: 20, color: '#ccc' }}>›</Text>}
@@ -1822,6 +1867,8 @@ const styles = StyleSheet.create({
   statusBadge: { marginTop: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, alignSelf: 'flex-start' },
   acceptBtn: { backgroundColor: GREEN, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   acceptBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  cancelReqBtn: { borderWidth: 1, borderColor: '#d9d9d9', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
+  cancelReqText: { color: '#666', fontSize: 13, fontWeight: '600' },
   profileCard: { alignItems: 'center', padding: 24, borderRadius: 16, borderWidth: 1, borderColor: '#f0f0f0', marginBottom: 20 },
   profileStats: { flexDirection: 'row', gap: 12, marginBottom: 32 },
   statItem: { flex: 1, alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#f0f0f0' },

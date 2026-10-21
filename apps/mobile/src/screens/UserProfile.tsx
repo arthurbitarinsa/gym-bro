@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { inboxStrings } from '../lib/inboxStrings'
 import UserActionsSheet from './SafetySheet'
+import { askCancel, cancelStrings } from '../lib/cancelRequest'
 import PhotoViewer from './PhotoViewer'
 
 const GREEN = '#1D9E75'
@@ -37,6 +38,7 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
 }) {
   const insets = useSafeAreaInsets()
   const x = inboxStrings(lang)
+  const cx = cancelStrings(lang)
   const [showPhoto, setShowPhoto] = useState(false)
   const [p, setP] = useState<any>(user)
   const [home, setHome] = useState<any>(null)
@@ -85,6 +87,14 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
     if (!error && data) { setMatch(data as Match); onChanged() }
     else if (error?.message.includes('duplicate')) setMatch({ id: '', status: 'pending', initiated_by: myId! })
     setBusy(false)
+  }
+
+  function cancel() {
+    if (!p?.id) return
+    askCancel(lang, name, p.id, r => {
+      if (r === 'cancelled') { setMatch(null); onChanged() }
+      else if (r === 'accepted') { setMatch(m => (m ? { ...m, status: 'accepted' } : m)); onChanged() }
+    })
   }
 
   async function accept() {
@@ -198,7 +208,12 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
           </TouchableOpacity>
         )}
         {state === 'out' && (
-          <View style={[st.cta, st.ctaSent]}><Text style={[st.ctaText, { color: GREEN }]}>{t.request_sent}</Text></View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={[st.cta, st.ctaSent, { flex: 1 }]}><Text style={[st.ctaText, { color: GREEN }]}>{t.request_sent}</Text></View>
+            <TouchableOpacity style={[st.cta, st.ctaCancel]} activeOpacity={0.7} onPress={cancel}>
+              <Text style={[st.ctaText, { color: '#666', fontSize: 15 }]}>{cx.cancel_short}</Text>
+            </TouchableOpacity>
+          </View>
         )}
         {state === 'none' && (
           <TouchableOpacity style={[st.cta, (busy || loading) && { opacity: 0.6 }]} activeOpacity={0.85} disabled={busy || loading} onPress={connect}>
@@ -266,5 +281,6 @@ const st = StyleSheet.create({
   barHint: { textAlign: 'center', fontSize: 13.5, color: '#5f6f69', marginBottom: 10 },
   cta: { backgroundColor: GREEN, borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
   ctaSent: { backgroundColor: MINT },
+  ctaCancel: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9d9d9', paddingHorizontal: 22 },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 })

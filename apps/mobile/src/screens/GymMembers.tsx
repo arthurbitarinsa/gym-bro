@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { getHiddenIds } from '../lib/safety'
 import { inboxStrings } from '../lib/inboxStrings'
+import { askCancel } from '../lib/cancelRequest'
 import type { Conversation } from '../lib/inbox'
 
 const GREEN = '#1D9E75'
@@ -63,6 +64,12 @@ export default function GymMembers({ t, lang, myId, gymId, gymName, connections,
     if (!error || error.message.includes('duplicate')) setRequested(prev => [...prev, id])
   }
 
+  function cancelSent(p: any) {
+    askCancel(lang, p.full_name || p.username || '', p.id, r => {
+      if (r === 'cancelled') setRequested(prev => prev.filter(x => x !== p.id))
+    })
+  }
+
   function row(p: any, visiting: boolean) {
     const nm = p.full_name || p.username || '?'
     const conn = connections.find(c => c.other?.id === p.id)
@@ -92,8 +99,8 @@ export default function GymMembers({ t, lang, myId, gymId, gymName, connections,
             <Text style={st.btnText}>{x.message}</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={[st.btn, sent && st.btnSent]} onPress={() => !sent && connect(p.id)} activeOpacity={0.8}>
-            <Text style={[st.btnText, sent && { color: GREEN }]}>{sent ? t.request_sent : t.connect}</Text>
+          <TouchableOpacity style={[st.btn, sent && st.btnSent]} onPress={() => (sent ? cancelSent(p) : connect(p.id))} activeOpacity={0.8}>
+            <Text style={[st.btnText, sent && { color: GREEN }]}>{sent ? `${t.request_sent} ✕` : t.connect}</Text>
           </TouchableOpacity>
         )}
       </TouchableOpacity>
