@@ -1,3 +1,5 @@
+import { EXTRA } from './logbookExtra'
+
 const STR: Record<string, Record<string, string>> = {
   en: {
     title: 'Logbook', together: 'Lifted together', today: 'Today', earlier: 'Earlier', add: 'Add lift',
@@ -121,7 +123,7 @@ const STR: Record<string, Record<string, string>> = {
 }
 
 export function logbookStrings(lang: string): Record<string, string> {
-  return { ...STR.en, ...(STR[lang] || {}) }
+  return { ...STR.en, ...EXTRA.en, ...(STR[lang] || {}), ...(EXTRA[lang] || {}) }
 }
 
 export function lfmt(text: string, vars: Record<string, string | number>): string {
