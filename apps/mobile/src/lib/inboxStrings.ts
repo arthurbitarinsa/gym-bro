@@ -2,7 +2,7 @@ const STR: Record<string, Record<string, string>> = {
   en: {
     chats: 'Chats',
     requests: 'Requests',
-    requests_sub: 'People who want to train with you',
+    requests_sub: 'Requests you sent and received',
     new_connections: 'New connections',
     no_chats: 'No chats yet',
     no_chats_sub: 'Say hi to a new connection or find a partner at your gym.',
@@ -34,7 +34,7 @@ const STR: Record<string, Record<string, string>> = {
   fr: {
     chats: 'Discussions',
     requests: 'Demandes',
-    requests_sub: "Des personnes veulent s'entraîner avec toi",
+    requests_sub: 'Demandes envoyées et reçues',
     new_connections: 'Nouvelles connexions',
     no_chats: 'Aucune discussion',
     no_chats_sub: 'Dis bonjour à une nouvelle connexion ou trouve un partenaire dans ta salle.',
@@ -66,7 +66,7 @@ const STR: Record<string, Record<string, string>> = {
   nl: {
     chats: 'Chats',
     requests: 'Verzoeken',
-    requests_sub: 'Mensen die met je willen trainen',
+    requests_sub: 'Verzonden en ontvangen verzoeken',
     new_connections: 'Nieuwe connecties',
     no_chats: 'Nog geen chats',
     no_chats_sub: 'Zeg hallo tegen een nieuwe connectie of zoek een partner in je gym.',
@@ -98,7 +98,7 @@ const STR: Record<string, Record<string, string>> = {
   de: {
     chats: 'Chats',
     requests: 'Anfragen',
-    requests_sub: 'Leute, die mit dir trainieren möchten',
+    requests_sub: 'Gesendete und erhaltene Anfragen',
     new_connections: 'Neue Kontakte',
     no_chats: 'Noch keine Chats',
     no_chats_sub: 'Sag Hallo zu einem neuen Kontakt oder finde einen Partner in deinem Gym.',
@@ -130,7 +130,7 @@ const STR: Record<string, Record<string, string>> = {
   es: {
     chats: 'Chats',
     requests: 'Solicitudes',
-    requests_sub: 'Personas que quieren entrenar contigo',
+    requests_sub: 'Solicitudes enviadas y recibidas',
     new_connections: 'Nuevas conexiones',
     no_chats: 'Aún no hay chats',
     no_chats_sub: 'Saluda a una nueva conexión o busca un compañero en tu gimnasio.',
@@ -162,7 +162,7 @@ const STR: Record<string, Record<string, string>> = {
   it: {
     chats: 'Chat',
     requests: 'Richieste',
-    requests_sub: 'Persone che vogliono allenarsi con te',
+    requests_sub: 'Richieste inviate e ricevute',
     new_connections: 'Nuove connessioni',
     no_chats: 'Ancora nessuna chat',
     no_chats_sub: 'Saluta una nuova connessione o trova un partner nella tua palestra.',
@@ -194,7 +194,7 @@ const STR: Record<string, Record<string, string>> = {
   pt: {
     chats: 'Conversas',
     requests: 'Pedidos',
-    requests_sub: 'Pessoas que querem treinar contigo',
+    requests_sub: 'Pedidos enviados e recebidos',
     new_connections: 'Novas ligações',
     no_chats: 'Ainda sem conversas',
     no_chats_sub: 'Diz olá a uma nova ligação ou encontra um parceiro no teu ginásio.',
