@@ -11,6 +11,7 @@ import {
 import { logbookStrings, lfmt } from '../lib/logbookStrings'
 import { exerciseName, searchExercises, type Group } from '../lib/exercises'
 import { StreakCard } from './StreakUI'
+import { RestBar } from './RestUI'
 import { haptic } from '../lib/haptics'
 
 const GREEN = '#1D9E75'
@@ -158,7 +159,7 @@ export default function Logbook({ lang, matchId, myId, otherName, onClose }: {
                   style={[st.setRow, e.status === 'pending' && st.chipPending]}>
                   <KindBadge kind={e.kind} n={i + 1} />
                   <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={st.liftText}>{e.is_pr ? '🔥 ' : ''}{setText(e, L.bw)}</Text>
+                    <Text style={st.liftText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{e.is_pr ? '🔥 ' : ''}{setText(e, L.bw)}</Text>
                     {e.status === 'pending' && (
                       <Text style={st.pendNote}>{e.user_id === myId ? lfmt(L.for_you, { name: first }) : lfmt(L.waiting_for, { name: first })}</Text>
                     )}
@@ -285,6 +286,7 @@ export default function Logbook({ lang, matchId, myId, otherName, onClose }: {
                   </>
                 )}
               </ScrollView>
+              <RestBar lang={lang} matchId={matchId} myId={myId} first={first} />
               <TouchableOpacity style={st.addBtn} onPress={() => setAdding({})} activeOpacity={0.85}>
                 <Text style={st.addBtnText}>＋ {L.add}</Text>
               </TouchableOpacity>
