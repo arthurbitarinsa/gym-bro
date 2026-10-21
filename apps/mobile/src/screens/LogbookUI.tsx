@@ -10,6 +10,8 @@ import {
 } from '../lib/logbook'
 import { logbookStrings, lfmt } from '../lib/logbookStrings'
 import { exerciseName, searchExercises, type Group } from '../lib/exercises'
+import { StreakCard } from './StreakUI'
+import { haptic } from '../lib/haptics'
 
 const GREEN = '#1D9E75'
 const DEEP = '#0E6B4F'
@@ -229,10 +231,13 @@ export default function Logbook({ lang, matchId, myId, otherName, onClose }: {
               <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
                 {lb.loading && <ActivityIndicator color={GREEN} style={{ marginTop: 30 }} />}
 
+                <StreakCard lang={lang} matchId={matchId} myId={myId} first={first}
+                  refreshKey={lb.days.reduce((a, d) => a + d.entries.filter(e => e.status === 'confirmed').length, 0)} />
+
                 {pendingGroups.map(items => (
                   <PendingCard key={`${items[0].workout_id}:${items[0].exercise_key}`} lang={lang} items={items} first={first}
                     onTap={e => setEditing(e)}
-                    onConfirm={async () => flashErr(await lb.respondBlock(items[0].workout_id, items[0].exercise_key || '', 'accept'))}
+                    onConfirm={async () => { const err = await lb.respondBlock(items[0].workout_id, items[0].exercise_key || '', 'accept'); if (!err) haptic.success(); flashErr(err) }}
                     onDecline={async () => flashErr(await lb.respondBlock(items[0].workout_id, items[0].exercise_key || '', 'delete'))} />
                 ))}
 
@@ -513,6 +518,7 @@ function SetBuilder({ lang, myId, first, lb, recentKeys, preset, onDone }: {
     setBusy(false)
     if (res.error) { Alert.alert(L[res.error]); return }
     Keyboard.dismiss()
+    if (res.isPr && !forOther) haptic.pr(); else haptic.success()
     setFlash(forOther ? lfmt(L.sent, { name: first }) : res.isPr ? `🔥 ${L.pr_badge}! ${L.saved}` : L.saved)
     setTimeout(() => setFlash(''), 2600)
     touched.current = false

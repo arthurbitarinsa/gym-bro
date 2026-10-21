@@ -25,6 +25,7 @@ import { callStrings } from './src/lib/callStrings'
 import { CallLayer, CallLockedSheet } from './src/screens/CallUI'
 import { inboxStrings } from './src/lib/inboxStrings'
 import { askCancel, cancelStrings } from './src/lib/cancelRequest'
+import { haptic } from './src/lib/haptics'
 import { usePush, unregisterPush, type PushTap } from './src/lib/push'
 import { useSpotter } from './src/lib/spotter'
 import { SpotterFab, SpotterSheet } from './src/screens/SpotterUI'
@@ -1521,7 +1522,7 @@ function DiscoverTab({ t, lang, onOpenProfile, session, profile, activeGymId, ac
 
   async function sendRequest(broId: string) {
     const { error } = await supabase.from('matches').insert({ user_a: session?.user.id, user_b: broId, initiated_by: session?.user.id, status: 'pending' })
-    if (!error) setSentRequests(prev => [...prev, broId])
+    if (!error) { haptic.tap(); setSentRequests(prev => [...prev, broId]) }
     else if (error.message.includes('duplicate')) setSentRequests(prev => [...prev, broId])
   }
 
@@ -1648,6 +1649,7 @@ function MatchesTab({ t, lang, session, onChanged, onOpenProfile }: { t: Record<
 
   async function acceptMatch(matchId: string) {
     await supabase.from('matches').update({ status: 'accepted' }).eq('id', matchId)
+    haptic.success()
     loadMatches()
     onChanged()
   }

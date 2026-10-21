@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { inboxStrings } from '../lib/inboxStrings'
 import UserActionsSheet from './SafetySheet'
 import { askCancel, cancelStrings } from '../lib/cancelRequest'
+import { haptic } from '../lib/haptics'
 import PhotoViewer from './PhotoViewer'
 
 const GREEN = '#1D9E75'
@@ -101,7 +102,7 @@ export default function UserProfile({ t, lang, myId, user, onBack, onOpenChat, o
     if (!match?.id) return
     setBusy(true)
     const { error } = await supabase.from('matches').update({ status: 'accepted' }).eq('id', match.id)
-    if (!error) { setMatch({ ...match, status: 'accepted' }); onChanged() }
+    if (!error) { haptic.success(); setMatch({ ...match, status: 'accepted' }); onChanged() }
     setBusy(false)
   }
 
